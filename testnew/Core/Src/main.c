@@ -60,7 +60,7 @@ int A = 2000;
 uint8_t B = 0;
 uint16_t C = 50;
 int Count = 0;
-uint32_t QEIReadRaw;
+int32_t QEIReadRaw;
 int test;
 
 uint16_t joyAnalogRead[40];
@@ -83,8 +83,9 @@ int scale = 4;
 int16_t RPSspeed;
 double speed;
 double MAXspeed;
-float Pos;
+double Pos;
 double pulse;
+float teet = -1.2341;
 typedef struct
 {
 // for record New / Old value to calculate dx / dt
@@ -120,6 +121,7 @@ uint64_t micros();
 void QEIEncoderPosVel_Update();
 void UARTInterruptConfig();
 void Joy_Averaged();
+void Joy_State();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -140,7 +142,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+   HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -185,76 +187,20 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
-	  if(state == 0)
-	  {
 
-	  }
-	  else if(state == 1)
-	  {
-		  if(joyY > 3200 || joyY < 2700)
-		  {
-			  if (joyY > 3200)
-			  {
-				  A = 21250;
-				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-				  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 21250);
-			  }
-			  else
-			  {
-				  A = -21250;
-				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
-				  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 21250);
-			  }
-		  }
-		  else
-		  {
-			  A = 0;
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-			  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 49999);
-		  }
-	  }
-	  else if(state == 2)
-	  {
-		  if(joyY > 3200 || joyY < 2700)
-		  		  {
-		  			  if (joyY > 3200)
-		  			  {
-		  				  A = 10625;
-		  				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-		  				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-		  				  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 10625);
-		  			  }
-		  			  else
-		  			  {
-		  				  A = -10625;
-		  				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-		  				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
-		  				  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 10625);
-		  			  }
-		  		  }
-		  		  else
-		  		  {
-		  			  A = 0;
-		  			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-		  			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-		  			  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 49999);
-		  		  }
-	  }
-	  else
-	  {
-
-	  }
 //test = abs(A);
 
 	  QEIReadRaw = __HAL_TIM_GET_COUNTER(&htim3);
 	  pulse = QEIReadRaw-57344;
-//	  Pos = ((QEIReadRaw+(Count*57344))*25*3.14)/8192;
-	  Pos = ((QEIReadRaw+(Count*57344))*360)/8192;
-	  Joy_Averaged();
+	  if(Count >= 0)
+	  {
+	  Pos = ((QEIReadRaw+(Count*57344))*25*3.14)/8192;
+	  }
+	  else
+	  {
+	Pos	= ((QEIReadRaw-(abs(Count)*57344))*25*3.14)/8192;
+	  }
+//	  Pos = ((QEIReadRaw+(Count*57344))*360)/8192;
 //	  PWMDrive =  (int16_t)(Rx[2]<< 8)+Rx[1];
 
 
@@ -271,7 +217,6 @@ int main(void)
 //		 		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 199);
 //	  }
 	  static uint64_t timestamp =0;
-	  static uint64_t timestamp2 =0;
 	  static uint64_t timestamp3 =0;
 	  int64_t currentTime = micros();
 	  if(currentTime > timestamp)
@@ -289,29 +234,7 @@ int main(void)
 	  HAL_UART_Transmit(&hlpuart1, dataBytes, sizeof(dataBytes), 10);
 	  timestamp3 =currentTime + 1000;
 	  }
-	  if(timestamp2 < HAL_GetTick())
-	  {
-		  if (joySW == 0)
-		 	  	{
-		 	  		switch (state)
-		 	  		{
-		 	  		case 0:
-		 	  			state = 1;
-		 	  			break;
-		 	  		case 1:
-		 	  			state = 2;
-		 	  			break;
-		 	  		case 2:
-		 	  			state = 3;
-		 	  			break;
-		 	  		case 3:
-						state = 0;
-						break;
-		 	  		}
-		 	  	}
-		  timestamp2 = HAL_GetTick() + 500;
-	  }
-
+	  Joy_State();
 //	  if(timestamp2 < HAL_GetTick())
 //	  {
 //		  static int thick = 1;
@@ -1064,23 +987,132 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		HAL_UART_Receive_IT(&hlpuart1, Rx, 4);
 	}
 }
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+void Joy_State()
 {
-	if (GPIO_Pin == GPIO_PIN_13)
+joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+if(state == 0)
+{
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1,0);
+	if (joyY > 4000)
 	{
-		switch (state)
-		{
-		case 0:
-			state = 1;
-			break;
-		case 1:
-			state = 2;
-			break;
-		case 2:
-			state = 0;
-			break;
-		}
+		__HAL_TIM_SET_COUNTER(&htim3, 0);
 	}
+}
+else if(state == 1)
+{
+static uint64_t timestamp4 =0;
+if(timestamp4 < HAL_GetTick())
+{
+if(joyX > 4000)
+{
+A = A-250;
+}
+if(joyX < 2000)
+{
+A = A+250;
+}
+if(A <= 0)A=0;
+timestamp4 = HAL_GetTick()+100;
+HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+}
+if(joyY > 4000 || joyY < 2000)
+{
+if (joyY > 4000)
+{
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, A);
+}
+else
+{
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
+__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, A);
+}
+}
+else
+{
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+}
+}
+else if(state == 2)
+{
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5,1);
+if(joyY > 3200 || joyY < 2700)
+{
+if (joyY > 3200)
+{
+A = 10625;
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 10625);
+}
+else
+{
+A = -10625;
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 10625);
+}
+}
+else
+{
+A = 0;
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1,0);
+}
+}
+else
+{
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1,0);
+}
+static uint64_t timestamp2 =0;
+if(timestamp2 < HAL_GetTick())
+{
+if (joySW == 0)
+{
+switch (state)
+{
+case 0:
+state = 1;
+while(joySW == 0)
+{
+joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+}
+break;
+case 1:
+state = 2;
+while(joySW == 0)
+{
+joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+}
+break;
+case 2:
+state = 3;
+while(joySW == 0)
+{
+joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+}
+break;
+case 3:
+state = 0;
+while(joySW == 0)
+{
+joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+}
+break;
+}
+}
+timestamp2 = HAL_GetTick() + 100;
+}
+Joy_Averaged();
 }
 void Joy_Averaged()
 {
