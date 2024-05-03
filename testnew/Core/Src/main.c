@@ -46,7 +46,6 @@ DMA_HandleTypeDef hdma_adc1;
 DMA_HandleTypeDef hdma_adc3;
 
 UART_HandleTypeDef hlpuart1;
-UART_HandleTypeDef huart1;
 
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
@@ -56,13 +55,47 @@ TIM_HandleTypeDef htim5;
 TIM_HandleTypeDef htim8;
 
 /* USER CODE BEGIN PV */
+//TEST
 int A = 2000;
 uint8_t B = 0;
 uint16_t C = 50;
-int Count = 0;
-int32_t QEIReadRaw;
 int test;
+int test2;
+int Maxtest=0;
+int start = 0;
+//TEST
 
+//PID
+typedef struct
+{
+// for record New / Old value to calculate dx / dt
+float Output[3];
+float Error[3];
+float kp;
+float ki;
+float kd;
+float T;
+}PID_StructureTypeDef;
+PID_StructureTypeDef Velocontrol = {0};
+PID_StructureTypeDef Poscontrol = {0};
+//PID
+
+//Trajectory
+float Pos_Start = 0;
+float Pos_Target = 300;
+float Old_Target = 300;
+float Velo_Start = 0;
+float Max_Velo = 500;
+float Max_Acc = 500;
+float t_Acc = 2;
+float q_Pos,q_Velo,q_Acc,diff_Pos,t;
+int state_Tra=0;
+int direction = 1;
+int m_Direction = 1;
+//Trajectory
+
+
+//JOY
 uint16_t joyAnalogRead[40];
 uint8_t joySW;
 uint8_t state;
@@ -70,6 +103,7 @@ uint16_t joyAvg[2];
 uint32_t joySum[2];
 uint16_t joyX;
 uint16_t joyY;
+//JOY
 
 
 uint8_t Rx[5];
@@ -77,15 +111,21 @@ uint8_t header = 0x45; // Header byte
 uint8_t parityBit = 0; // Parity bit initialized to 0
 uint8_t dataBytes[5]; // Array to hold the bytes of uint16_t and parity bit
 uint16_t dataSend = 0;
+
 int PWMDrive;
 int scale = 4;
-
 int16_t RPSspeed;
 double speed;
+double speed_1;
 double MAXspeed;
+double speed_fill;
+double speed_fill_1;
 double Pos;
 double pulse;
-float teet = -1.2341;
+
+//Encoder
+int Count = 0;
+int32_t QEIReadRaw;
 typedef struct
 {
 // for record New / Old value to calculate dx / dt
@@ -98,8 +138,9 @@ QEI_StructureTypeDef QEIdata = {0};
 uint64_t _micros = 0;
 enum
 {
-NEW,OLD
+NEW,OLD,OLDER
 };
+//Encoder
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -108,7 +149,6 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_LPUART1_UART_Init(void);
 static void MX_ADC1_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
@@ -118,10 +158,11 @@ static void MX_TIM5_Init(void);
 static void MX_ADC3_Init(void);
 /* USER CODE BEGIN PFP */
 uint64_t micros();
-void QEIEncoderPosVel_Update();
+void QEIEncoderVel_Update();
 void UARTInterruptConfig();
 void Joy_Averaged();
 void Joy_State();
+void Trajectory();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -142,7 +183,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-   HAL_Init();
+  HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -160,7 +201,6 @@ int main(void)
   MX_DMA_Init();
   MX_LPUART1_UART_Init();
   MX_ADC1_Init();
-  MX_USART1_UART_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
@@ -178,6 +218,16 @@ int main(void)
   _micros = 0;
   UARTInterruptConfig();
 
+	Velocontrol.kp = 190;
+	Velocontrol.ki = 0.05;
+	Velocontrol.kd = 0;
+	Velocontrol.T = 0.0001;
+
+	Poscontrol.kp = 1.2;//2.015
+	Poscontrol.ki = 1.890;//4.5425
+	Poscontrol.kd = 0;//0.0000021
+	Poscontrol.T = 0.0001;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -187,90 +237,110 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-//test = abs(A);
-
 	  QEIReadRaw = __HAL_TIM_GET_COUNTER(&htim3);
-	  pulse = QEIReadRaw-57344;
 	  if(Count >= 0)
 	  {
-	  Pos = ((QEIReadRaw+(Count*57344))*25*3.14)/8192;
+		  Pos = ((QEIReadRaw+(Count*57344))*25*3.14)/8192;
 	  }
 	  else
 	  {
-	Pos	= ((QEIReadRaw-(abs(Count)*57344))*25*3.14)/8192;
+		  Pos	= ((QEIReadRaw-(fabs(Count)*57344))*25*3.14)/8192;
 	  }
-//	  Pos = ((QEIReadRaw+(Count*57344))*360)/8192;
-//	  PWMDrive =  (int16_t)(Rx[2]<< 8)+Rx[1];
-
-
-//	  if(Pos < C)
-//	  {
-//		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-//		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
-//	  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, A);
-//	  }
-//	  else
-//	  {
-//		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-//		 		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-//		 		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 199);
-//	  }
 	  static uint64_t timestamp =0;
 	  static uint64_t timestamp3 =0;
 	  int64_t currentTime = micros();
 	  if(currentTime > timestamp)
 	  {
-	  timestamp =currentTime + 100000;//us
-	  QEIEncoderPosVel_Update();
-	  }
-	  if(currentTime > timestamp3)
-	  {
-	  dataSend = RPSspeed;
-	  dataBytes[0] = header; // Header byte
-	  dataBytes[1] = (uint8_t)(dataSend & 0xFF); // Lower byte
-	  dataBytes[2] = (uint8_t)((dataSend >> 8) & 0xFF); // Upper byte
-	  dataBytes[3] = 0x0A;
-	  HAL_UART_Transmit(&hlpuart1, dataBytes, sizeof(dataBytes), 10);
-	  timestamp3 =currentTime + 1000;
+		QEIEncoderVel_Update();
+		timestamp =currentTime + 100;//us
 	  }
 	  Joy_State();
-//	  if(timestamp2 < HAL_GetTick())
-//	  {
-//		  static int thick = 1;
-//		  static int timee = 3000;
-//		  if(thick == 0)
-//		  {
-//
-//			  scale += 2;
-//			  if(scale >= 25)
-//			  {
-//				  PWMDrive = 0;
-//				  timee = 10000000;
-//			  }
-//			  PWMDrive = scale*(42500/24);
-//			  thick = 1;
-//
-//
-//		  }
-//		  else
-//		  {
-//			  PWMDrive = 0;
-//			  thick = 0;
-//
-//		  }
-//
-//	  timestamp2 = HAL_GetTick() + timee;
-//	  }
+	  if(start == 1)
+	  {
+		  Trajectory();
+		  if(Pos <500)
+		  {
+			  if(currentTime > timestamp3)
+			  {
+					Poscontrol.Error[NEW] = q_Pos-Pos;
+					Poscontrol.Output[NEW] = ((((Poscontrol.kp*Poscontrol.T)+(Poscontrol.ki*Poscontrol.T*Poscontrol.T)+(Poscontrol.kd))*Poscontrol.Error[NEW])-(((Poscontrol.kp*Poscontrol.T)+(Poscontrol.kd))*Poscontrol.Error[OLD])+(Poscontrol.kd*Poscontrol.Error[OLDER])+(Poscontrol.Output[OLD]*Poscontrol.T))/Poscontrol.T;
+					Poscontrol.Error[OLDER] = Poscontrol.Error[OLD];
+					Poscontrol.Error[OLD] = Poscontrol.Error[NEW];
+					Poscontrol.Output[OLDER] = Poscontrol.Output[OLD];
+					Poscontrol.Output[OLD] = Poscontrol.Output[NEW];
 
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-//	  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, PWMDrive);
-//	  HAL_Delay(1000);
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-//	  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-//	  HAL_Delay(1000);
+					Velocontrol.Error[NEW] = Poscontrol.Output[NEW]+q_Velo-speed_fill;
+					Velocontrol.Output[NEW] = ((((Velocontrol.kp*Velocontrol.T)+(Velocontrol.ki*Velocontrol.T*Velocontrol.T)+(Velocontrol.kd))*Velocontrol.Error[NEW])-(((Velocontrol.kp*Velocontrol.T)+(Velocontrol.kd))*Velocontrol.Error[OLD])+(Velocontrol.kd*Velocontrol.Error[OLDER])+(Velocontrol.Output[OLD]*Velocontrol.T))/Velocontrol.T;
+					Velocontrol.Error[OLDER] = Velocontrol.Error[OLD];
+					Velocontrol.Error[OLD] = Velocontrol.Error[NEW];
+					Velocontrol.Output[OLDER] = Velocontrol.Output[OLD];
+					Velocontrol.Output[OLD] = Velocontrol.Output[NEW];
+
+//					if(fabs(Pos_Target-Pos) <= 0.1)start = 0;
+			  timestamp3 =currentTime + 100;
+			  }
+			  if(Velocontrol.Output[NEW] > 0)
+			  {
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+	  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, Velocontrol.Output[NEW]);
+			  }
+			  else
+			  {
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+	  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
+			  }
+	  }
+		  else
+		  {
+			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+
+		  }
+	  }
+	  else if(start == 2)
+	  {
+		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+		Velocontrol.Error[NEW] = 0;
+		Velocontrol.Error[OLD] = 0;
+		Velocontrol.Error[OLDER] = 0;
+		Velocontrol.Output[NEW] = 0;
+		Velocontrol.Output[OLD] = 0;
+		Velocontrol.Output[OLDER] = 0;
+
+		Poscontrol.Error[NEW] = 0;
+		Poscontrol.Error[OLD] = 0;
+		Poscontrol.Error[OLDER] = 0;
+		Poscontrol.Output[NEW] = 0;
+		Poscontrol.Output[OLD] = 0;
+		Poscontrol.Output[OLDER] = 0;
+		t = 0;
+		static uint64_t timestamp4 =0;
+		if(currentTime > timestamp4)
+		{
+			HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+			timestamp4 =currentTime + 200000;
+		}
+
+	  }
+	  else
+	  {
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+	  }
+
+
+
+	  //	  if(currentTime > timestamp3)
+	  //	  {
+	  //	  dataSend = RPSspeed;
+	  //	  dataBytes[0] = header; // Header byte
+	  //	  dataBytes[1] = (uint8_t)(dataSend & 0xFF); // Lower byte
+	  //	  dataBytes[2] = (uint8_t)((dataSend >> 8) & 0xFF); // Upper byte
+	  //	  dataBytes[3] = 0x0A;
+	  //	  HAL_UART_Transmit(&hlpuart1, dataBytes, sizeof(dataBytes), 10);
+	  //	  timestamp3 =currentTime + 1000;
+	  //	  }
   }
   /* USER CODE END 3 */
 }
@@ -510,54 +580,6 @@ static void MX_LPUART1_UART_Init(void)
   /* USER CODE BEGIN LPUART1_Init 2 */
 
   /* USER CODE END LPUART1_Init 2 */
-
-}
-
-/**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_RTS;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-
-  /* USER CODE END USART1_Init 2 */
 
 }
 
@@ -918,7 +940,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : PB4 PB5 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
   /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
@@ -934,11 +968,13 @@ if(htim == &htim5)
 _micros += UINT32_MAX;
 }
 }
+
 uint64_t micros()
 {
 return __HAL_TIM_GET_COUNTER(&htim5)+_micros;
 }
-void QEIEncoderPosVel_Update()
+
+void QEIEncoderVel_Update()
 {
 //collect data
 QEIdata.TimeStamp[NEW] = micros();
@@ -964,9 +1000,12 @@ float diffTime = (QEIdata.TimeStamp[NEW]-QEIdata.TimeStamp[OLD]) * 0.000001;
 QEIdata.QEIAngularVelocity = diffPosition / diffTime;
 RPSspeed = ((QEIdata.QEIAngularVelocity)/8192)*60;
 speed = ((QEIdata.QEIAngularVelocity)/8192)*12.5*2*3.14;
-if(speed>MAXspeed)
+speed_fill = (0.969*speed_fill_1)+(0.0155*speed)+(0.0155*speed_1);
+speed_1 = speed;
+speed_fill_1 = speed_fill;
+if(speed_fill>MAXspeed)
 {
-	MAXspeed = speed;
+	MAXspeed = speed_fill;
 }
 //store value for next loop
 QEIdata.Position[OLD] = QEIdata.Position[NEW];
@@ -987,14 +1026,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		HAL_UART_Receive_IT(&hlpuart1, Rx, 4);
 	}
 }
+
 void Joy_State()
 {
 joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
 if(state == 0)
 {
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1,0);
+//	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+//	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1,0);
 	if (joyY > 4000)
 	{
 		__HAL_TIM_SET_COUNTER(&htim3, 0);
@@ -1002,118 +1041,112 @@ if(state == 0)
 }
 else if(state == 1)
 {
-static uint64_t timestamp4 =0;
-if(timestamp4 < HAL_GetTick())
-{
-if(joyX > 4000)
-{
-A = A-250;
-}
-if(joyX < 2000)
-{
-A = A+250;
-}
-if(A <= 0)A=0;
-timestamp4 = HAL_GetTick()+100;
-HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-}
-if(joyY > 4000 || joyY < 2000)
-{
-if (joyY > 4000)
-{
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, A);
-}
-else
-{
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
-__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, A);
-}
-}
-else
-{
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-}
+	static uint64_t timestamp4 =0;
+	if(timestamp4 < HAL_GetTick())
+	{
+		if(joyX > 4000)
+		{
+			A = A-250;
+		}
+		if(joyX < 2000)
+		{
+			A = A+250;
+		}
+		if(A <= 0)A=0;
+		timestamp4 = HAL_GetTick()+100;
+		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+	}
+	if(joyY > 4000 || joyY < 2000)
+	{
+		if (joyY > 4000)
+		{
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, A);
+		}
+		else
+		{
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, A);
+		}
+	}
+	else
+	{
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+	}
 }
 else if(state == 2)
 {
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5,1);
-if(joyY > 3200 || joyY < 2700)
-{
-if (joyY > 3200)
-{
-A = 10625;
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 10625);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5,1);
+	if(joyY > 3200 || joyY < 2700)
+	{
+		if (joyY > 3200)
+		{
+			A = 10625;
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 2125);
+		}
+		else
+		{
+			A = -10625;
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 2125);
+		}
+	}
+	else
+	{
+		A = 0;
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1,0);
+	}
+ }
+	else
+	{
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1,0);
+	}
+	static uint64_t timestamp2 =0;
+	if(timestamp2 < HAL_GetTick())
+	{
+		if (joySW == 0)
+		{
+			switch (state)
+			{
+			case 0:
+				state = 1;
+				while(joySW == 0)
+				{
+					joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+				}
+				break;
+			case 1:
+				state = 2;
+				while(joySW == 0)
+				{
+					joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+				}
+				break;
+			case 2:
+				state = 3;
+				while(joySW == 0)
+				{
+					joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+				}
+				break;
+			case 3:
+				state = 0;
+				while(joySW == 0)
+				{
+					joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+				}
+				break;
+			}
+		}
+		timestamp2 = HAL_GetTick() + 100;
+	}
+	Joy_Averaged();
 }
-else
-{
-A = -10625;
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 10625);
-}
-}
-else
-{
-A = 0;
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1,0);
-}
-}
-else
-{
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1,0);
-}
-static uint64_t timestamp2 =0;
-if(timestamp2 < HAL_GetTick())
-{
-if (joySW == 0)
-{
-switch (state)
-{
-case 0:
-state = 1;
-while(joySW == 0)
-{
-joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
-}
-break;
-case 1:
-state = 2;
-while(joySW == 0)
-{
-joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
-}
-break;
-case 2:
-state = 3;
-while(joySW == 0)
-{
-joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
-}
-break;
-case 3:
-state = 0;
-while(joySW == 0)
-{
-joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
-}
-break;
-}
-}
-timestamp2 = HAL_GetTick() + 100;
-}
-Joy_Averaged();
-}
+
 void Joy_Averaged()
 {
 	for (int i = 0; i < 20; i++)
@@ -1130,6 +1163,126 @@ void Joy_Averaged()
 
 	joyX = joyAvg[0];
 	joyY = joyAvg[1];
+}
+void Trajectory()
+{
+	static uint64_t timestamp_Traject =0;
+		int64_t currentTime = micros();
+		  if(timestamp_Traject < currentTime)
+		  {
+			  switch(state_Tra)
+			  	  		  {
+			  	  		  case 0:
+			  	  			  if(Pos_Start > Pos_Target)
+			  	  			  {
+			  	  				  direction = -1;
+			  	  				  m_Direction = -1;
+			  	  			  }
+			  	  			  else
+			  	  			  {
+			  	  				  direction = 1;
+			  	  				  m_Direction = 1;
+			  	  			  }
+			  	  			  	q_Pos = Pos_Start + (Velo_Start*t)+((direction*0.5*Max_Acc)*(t*t));
+			  	  			  	q_Velo = Velo_Start + direction*Max_Acc*t;
+			  	  			  	q_Acc = Max_Acc*direction;
+			  	  			  if(fabs(q_Velo) >= Max_Velo)
+			  	  				{
+			  	  					state_Tra = 1;
+			  	  					Pos_Start = q_Pos;
+			  	  					Velo_Start = q_Velo;
+			  	  					t = 0;
+			  	  				}
+			  	  			  if(fabs((q_Pos-Pos_Start)*2) >= fabs(Pos_Target-Pos_Start))
+			  	  			  {
+			  	  				state_Tra = 2;
+								Pos_Start = q_Pos;
+								Velo_Start = q_Velo;
+								t = 0;
+			  	  			  }
+			  	  			  	break;
+			  	  		  case 1:
+			  	  			  	q_Pos = Pos_Start +(Velo_Start*t);
+			  	  			  	q_Velo = Velo_Start;
+			  	  			  	q_Acc = 0;
+			  	  			  if(Pos_Target-q_Pos <= (q_Velo*q_Velo)/(2*Max_Acc))
+			  	  				{
+			  	  					state_Tra = 2;
+			  	  					Pos_Start = q_Pos;
+			  	  					Velo_Start = q_Velo;
+			  	  					t = 0;
+			  	  				}
+			  	  			  	break;
+			  	  		  case 2:
+//			  	  			  	if(direction == -1)
+//			  	  			  	{
+//			  	  			  	 m_Direction = 1;
+//			  	  			  	}
+			  	  			  	q_Pos = Pos_Start + (Velo_Start*t)-((direction*0.5*Max_Acc)*(t*t));
+			  	  			  	q_Velo = Velo_Start - direction*Max_Acc*t;
+			  	  			  	q_Acc = -direction*Max_Acc;
+			  	  			  if(fabs(q_Velo) <= 0)
+			  	  				{
+			  	  					state_Tra = 3;
+			  	  					t = 0;
+			  	  				}
+			  	  			  	break;
+			  	  		  case 3:
+			  	  			  	if(Pos_Target != Old_Target)
+			  	  			  	{
+
+
+			  	  			  		state_Tra = 0;
+			  	  			  		t = 0;
+			  	  			  		Pos_Start = q_Pos;
+			  	  			  		Velo_Start = q_Velo;
+			  	  			  		Old_Target = Pos_Target;
+
+
+			  	  			  		Velocontrol.Error[NEW] = 0;
+									Velocontrol.Error[OLD] = 0;
+									Velocontrol.Error[OLDER] = 0;
+									Velocontrol.Output[NEW] = 0;
+									Velocontrol.Output[OLD] = 0;
+									Velocontrol.Output[OLDER] = 0;
+
+									Poscontrol.Error[NEW] = 0;
+									Poscontrol.Error[OLD] = 0;
+									Poscontrol.Error[OLDER] = 0;
+									Poscontrol.Output[NEW] = 0;
+									Poscontrol.Output[OLD] = 0;
+									Poscontrol.Output[OLDER] = 0;
+
+			  	  			  	}
+			  	  			  	break;
+			  	  		  }
+//			  error_Velo = q_Velo-speed;
+//			  output = ((2*kp_Velo*T*error_Velo) - (2*kp_Velo*T*error_Velo_2) +(ki_Velo*T*T*error_Velo)+(2*ki_Velo*T*T*error_Velo_1)+(ki_Velo*T*T*error_Velo_2)+(4*kd_Velo*error_Velo)-(8*kd_Velo*error_Velo_1)-(4*kd_Velo*error_Velo_2)+(2*output_2*T))/(2*T);
+//			  error_Velo_2 = error_Velo_1;
+//			  error_Velo_1 = error_Velo;
+//			  output_2 = output_1;
+//			  output_1 = output;
+		  t = t+0.0001;
+		  timestamp_Traject = currentTime + 100;
+		  }
+}
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin == GPIO_PIN_13)
+	{
+		start  = 1;
+	}
+	if(GPIO_Pin == GPIO_PIN_4)
+	{
+		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+//		__HAL_TIM_SET_COUNTER(&htim3,0);
+		start = 2;
+	}
+	if(GPIO_Pin == GPIO_PIN_5)
+	{
+		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+		start = 2;
+	}
 }
 /* USER CODE END 4 */
 

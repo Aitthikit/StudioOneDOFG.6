@@ -44,14 +44,28 @@
 UART_HandleTypeDef hlpuart1;
 
 /* USER CODE BEGIN PV */
+float output;
+float output_1;
+float output_2;
+float kp_Velo;
+float ki_Velo;
+float kd_Velo;
+float T = 0.001;
+float error_Velo;
+float error_Velo_1;
+float error_Velo_2;
+
+
 float Pos_Start = 0;
-float Pos_Target = 3000;
+float Pos_Target = 300;
+float Old_Target = 300;
 float Velo_Start = 0;
-float Max_Velo = 500;
-float Max_Acc = 300;
+float Max_Velo = 400;
+float Max_Acc = 500;
 float t_Acc = 2;
 float q_Pos,q_Velo,q_Acc,diff_Pos,t;
 int state_Tra=0;
+int direction = 1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -114,46 +128,69 @@ int main(void)
 		  switch(state_Tra)
 		  	  		  {
 		  	  		  case 0:
-		  	  			  	q_Pos = Pos_Start + (Velo_Start*t)+(0.5*Max_Acc)*(t*t);
-		  	  			  	q_Velo = Velo_Start + Max_Acc*t;
-		  	  			  	q_Acc = Max_Acc;
-		  	  			  if(q_Velo >= Max_Velo)
+		  	  			  if(Pos_Start > Pos_Target)
+		  	  			  {
+		  	  				  direction = -1;
+		  	  			  }
+		  	  			  else
+		  	  			  {
+		  	  				  direction = 1;
+		  	  			  }
+		  	  			  	q_Pos = Pos_Start + (Velo_Start*t)+((direction*0.5*Max_Acc)*(t*t));
+		  	  			  	q_Velo = Velo_Start + direction*Max_Acc*t;
+		  	  			  	q_Acc = Max_Acc*direction;
+		  	  			  if(fabs(q_Velo) >= Max_Velo)
 		  	  				{
 		  	  					state_Tra = 1;
 		  	  					Pos_Start = q_Pos;
+		  	  					Velo_Start = q_Velo;
+		  	  					t = 0;
 		  	  				}
+		  	  			  if(fabs((q_Pos-Pos_Start)*2) >= fabs(Pos_Target-Pos_Start))
+		  	  			  {
+		  	  				state_Tra = 2;
+							Pos_Start = q_Pos;
+							Velo_Start = q_Velo;
+							t = 0;
+		  	  			  }
 		  	  			  	break;
 		  	  		  case 1:
 		  	  			  	q_Pos = Pos_Start +(Velo_Start*t);
-		  	  			  	q_Velo = q_Velo;
+		  	  			  	q_Velo = Velo_Start;
 		  	  			  	q_Acc = 0;
-		  	  			  if(q_Pos <= (q_Velo*q_Velo)/(2*Max_Acc))
+		  	  			  if(Pos_Target-q_Pos <= (q_Velo*q_Velo)/(2*Max_Acc))
 		  	  				{
 		  	  					state_Tra = 2;
 		  	  					Pos_Start = q_Pos;
 		  	  					Velo_Start = q_Velo;
+		  	  					t = 0;
 		  	  				}
 		  	  			  	break;
 		  	  		  case 2:
-		  	  			  	q_Pos = Pos_Start + (Velo_Start*t)-(0.5*Max_Acc)*(t*t);
-		  	  			  	q_Velo = Velo_Start - Max_Acc*t;
-		  	  			  	q_Acc = -Max_Acc;
-		  	  			  if(q_Velo <= 0)
+		  	  			  	q_Pos = Pos_Start + (Velo_Start*t)-((direction*0.5*Max_Acc)*(t*t));
+		  	  			  	q_Velo = Velo_Start - direction*Max_Acc*t;
+		  	  			  	q_Acc = -direction*Max_Acc;
+		  	  			  if(fabs(q_Velo) <= 0)
 		  	  				{
 		  	  					state_Tra = 3;
 		  	  				}
 		  	  			  	break;
 		  	  		  case 3:
-		  	  			  	q_Pos = 0;
-		  	  			  	q_Velo = 0;
-		  	  			  	q_Acc = 0;
-		  	  			  	t = 0;
-		  	  			  	state_Tra = 0;
+		  	  			  	if(Pos_Target != Old_Target)
+		  	  			  	{
+		  	  			  		state_Tra = 0;
+		  	  			  		t = 0;
+		  	  			  		Pos_Start = q_Pos;
+		  	  			  		Velo_Start = q_Velo;
+		  	  			  		Old_Target = Pos_Target;
+		  	  			  	}
 		  	  			  	break;
 		  	  		  }
-	  t = t+0.01;
-	  timestamp = HAL_GetTick()+10;
+	  t = t+0.001;
+	  timestamp = HAL_GetTick()+1;
 	  }
+//	  error_Velo =
+//	  output = ((2*kp_Velo*T*error_Velo) - (2*kp_Velo*T-error_Velo_2) +(ki_Velo*T*T*error_Velo)+(2*ki_Velo*T*T*error_Velo_1)+(ki_Velo*T*T*error_Velo_2)+(4*kd_Velo*error_Velo)-(8*kd_Velo*error_Velo_1)-(4*kd_Velo*error_Velo_2)+(2*output_2*T))/(2*T);
   }
   /* USER CODE END 3 */
 }
