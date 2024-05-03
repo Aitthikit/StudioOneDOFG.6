@@ -63,6 +63,8 @@ int test;
 int test2;
 int Maxtest=0;
 int start = 0;
+int state_ALL = 1;
+int HOME = 0;
 //TEST
 
 //PID
@@ -159,10 +161,12 @@ static void MX_ADC3_Init(void);
 /* USER CODE BEGIN PFP */
 uint64_t micros();
 void QEIEncoderVel_Update();
+void QEIEncoderPos_Update();
 void UARTInterruptConfig();
 void Joy_Averaged();
 void Joy_State();
 void Trajectory();
+void Motor();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -227,7 +231,6 @@ int main(void)
 	Poscontrol.ki = 1.890;//4.5425
 	Poscontrol.kd = 0;//0.0000021
 	Poscontrol.T = 0.0001;
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -237,24 +240,52 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  QEIReadRaw = __HAL_TIM_GET_COUNTER(&htim3);
-	  if(Count >= 0)
-	  {
-		  Pos = ((QEIReadRaw+(Count*57344))*25*3.14)/8192;
-	  }
-	  else
-	  {
-		  Pos	= ((QEIReadRaw-(fabs(Count)*57344))*25*3.14)/8192;
-	  }
+	  //Timer SET
+	  int64_t currentTime = micros();
 	  static uint64_t timestamp =0;
 	  static uint64_t timestamp3 =0;
-	  int64_t currentTime = micros();
+	  static uint64_t timestamp5 =0;
+	  //Timer SET
+	  QEIEncoderPos_Update();
 	  if(currentTime > timestamp)
 	  {
 		QEIEncoderVel_Update();
 		timestamp =currentTime + 100;//us
 	  }
-	  Joy_State();
+	  switch (state_ALL)
+	  			{
+	  			case 0://HOME
+					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+					__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 10250);
+					if(HOME == 1|| HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_4) == 1)
+					{
+						state_ALL = 1;
+					}
+	  				break;
+	  			case 1://Standby
+	  				if(start == 1)//MODBUS HERE
+	  				{
+	  					state_ALL = 2;
+	  				}
+	  				if(start == 1)//MODBUS HERE
+					{
+						state_ALL = 2;
+					}
+	  				if(start == 1)//HOME Button
+					{
+						state_ALL = 2;
+					}
+	  				break;
+	  			case 2://JOY SET
+	  				Joy_State();
+	  				break;
+	  			case 3://PID
+
+	  				break;
+	  			case 4://TEST
+
+					break;
+	  			}
 	  if(start == 1)
 	  {
 		  Trajectory();
@@ -275,21 +306,20 @@ int main(void)
 					Velocontrol.Error[OLD] = Velocontrol.Error[NEW];
 					Velocontrol.Output[OLDER] = Velocontrol.Output[OLD];
 					Velocontrol.Output[OLD] = Velocontrol.Output[NEW];
-
 //					if(fabs(Pos_Target-Pos) <= 0.1)start = 0;
-			  timestamp3 =currentTime + 100;
+					timestamp3 =currentTime + 100;
 			  }
 			  if(Velocontrol.Output[NEW] > 0)
 			  {
-	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-	  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, Velocontrol.Output[NEW]);
+				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+				  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, Velocontrol.Output[NEW]);
 			  }
 			  else
 			  {
-	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-	  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
+				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+				  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
 			  }
-	  }
+		  }
 		  else
 		  {
 			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
@@ -315,13 +345,11 @@ int main(void)
 		Poscontrol.Output[OLD] = 0;
 		Poscontrol.Output[OLDER] = 0;
 		t = 0;
-		static uint64_t timestamp4 =0;
-		if(currentTime > timestamp4)
+		if(currentTime > timestamp5)
 		{
 			HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-			timestamp4 =currentTime + 200000;
+			timestamp5 =currentTime + 200000;
 		}
-
 	  }
 	  else
 	  {
@@ -974,6 +1002,18 @@ uint64_t micros()
 return __HAL_TIM_GET_COUNTER(&htim5)+_micros;
 }
 
+void QEIEncoderPos_Update()
+{
+	QEIReadRaw = __HAL_TIM_GET_COUNTER(&htim3);
+	if(Count >= 0)
+	{
+		Pos = ((QEIReadRaw+(Count*57344))*25*3.14)/8192;
+	}
+	else
+	{
+		Pos	= ((QEIReadRaw-(fabs(Count)*57344))*25*3.14)/8192;
+	}
+}
 void QEIEncoderVel_Update()
 {
 //collect data
@@ -1030,6 +1070,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void Joy_State()
 {
 joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+
 if(state == 0)
 {
 //	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
@@ -1039,6 +1080,7 @@ if(state == 0)
 		__HAL_TIM_SET_COUNTER(&htim3, 0);
 	}
 }
+
 else if(state == 1)
 {
 	static uint64_t timestamp4 =0;
@@ -1075,6 +1117,7 @@ else if(state == 1)
 		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
 	}
 }
+
 else if(state == 2)
 {
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5,1);
@@ -1276,12 +1319,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	{
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 //		__HAL_TIM_SET_COUNTER(&htim3,0);
-		start = 2;
+		HOME = 1;
 	}
 	if(GPIO_Pin == GPIO_PIN_5)
 	{
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-		start = 2;
+		HOME = 1;
 	}
 }
 /* USER CODE END 4 */

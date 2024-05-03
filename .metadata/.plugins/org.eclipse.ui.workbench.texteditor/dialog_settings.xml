@@ -9,9 +9,12 @@
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
 			<item value="Velo"/>
+			<item value="Pos"/>
+			<item value="test"/>
 		</list>
 		<list key="replacehistory">
 			<item value="Pos"/>
+			<item value="Velo"/>
 		</list>
 	</section>
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
