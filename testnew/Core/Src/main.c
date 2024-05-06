@@ -62,9 +62,16 @@ int test2;
 int Maxtest=0;
 int start = 0;
 int state_ALL = 2;
+int state_ALL_Old = 0;
+int state_Griper = 0;
 int HOME = 0;
 int ButtonTest[6];
+int LeadSW[2];
 int CountSetpoint;
+int CountGriper;
+float MemPos[5];
+int Move[10] = {5,1,4,3,1,2,3,5,2,4};
+int i = 0;
 //TEST
 
 //PID
@@ -84,8 +91,8 @@ PID_StructureTypeDef Poscontrol = {0};
 
 //Trajectory
 float Pos_Start = 0;
-float Pos_Target = 300;
-float Old_Target = 300;
+float Pos_Target = 0;
+float Old_Target = 0;
 float Velo_Start = 0;
 float Max_Velo = 500;
 float Max_Acc = 500;
@@ -117,12 +124,12 @@ uint16_t dataSend = 0;
 int PWMDrive;
 int scale = 4;
 int16_t RPSspeed;
-double speed;
-double speed_1;
-double MAXspeed;
-double speed_fill;
-double speed_fill_1;
-double Pos;
+float speed;
+float speed_1;
+float MAXspeed;
+float speed_fill;
+float speed_fill_1;
+float Pos;
 double pulse;
 
 //Encoder
@@ -167,6 +174,7 @@ void Joy_State();
 void Trajectory();
 void Motor();
 void reset();
+void PIDposition();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -187,8 +195,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-
-	HAL_Init();
+  HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -222,14 +229,14 @@ int main(void)
   _micros = 0;
   UARTInterruptConfig();
 
-	Velocontrol.kp = 170;
-	Velocontrol.ki = 1;
+	Velocontrol.kp = 225;//180
+	Velocontrol.ki = 2;//25
 	Velocontrol.kd = 0;
 	Velocontrol.T = 0.0001;
 
-	Poscontrol.kp = 1.4;//2.015
-	Poscontrol.ki = 1.890;//4.5425
-	Poscontrol.kd = 0.0000001;//0.0000021
+	Poscontrol.kp = 0.5667;//2.015,0.6
+	Poscontrol.ki = 1.29;//4.5425,1.34
+	Poscontrol.kd = 0.000001;//0.0000021,0.0000004
 	Poscontrol.T = 0.0001;
   /* USER CODE END 2 */
 
@@ -243,7 +250,6 @@ int main(void)
 	  //Timer SET
 	  int64_t currentTime = micros();
 	  static uint64_t timestamp =0;
-	  static uint64_t timestamp3 =0;
 	  static uint64_t timestamp5 =0;
 	  //Timer SET
 		if(currentTime > timestamp)
@@ -259,6 +265,10 @@ int main(void)
 	ButtonTest[3] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_9);
 	ButtonTest[4] = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_7);
 	ButtonTest[5] = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6);
+	LeadSW[0] = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
+	LeadSW[1] = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_1);
+	test = LeadSW[1] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1);
+	test2 = LeadSW[0] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1);
 	  switch (state_ALL)
 	  			{
 	  			case 0://HOME
@@ -273,6 +283,7 @@ int main(void)
 						Count = 0;
 						QEIdata.Position[NEW] = 0;
 						QEIdata.Position[OLD] = 0;
+						Pos_Start = 0;
 						state_ALL = 2;
 						state_Tra = 0;
 						break;
@@ -288,9 +299,9 @@ int main(void)
 	  				{
 	  					state_ALL = 2;
 	  				}
-	  				if(start == 1)//MODBUS HERE
+	  				if(ButtonTest[1] == 0)//MODBUS HERE
 					{
-						state_ALL = 2;
+						state_ALL = 4;
 					}
 	  				if(start == 1)//HOME Button
 					{
@@ -304,6 +315,14 @@ int main(void)
 					{
 						state_ALL = 0;
 					}
+	  				if(ButtonTest[1] == 0)
+					{
+						state_ALL = 4;
+					}
+	  				if(ButtonTest[2] == 0)
+					{
+						state_ALL = 5;
+					}
 	  				if(start == 1)
 	  				{
 	  					state_ALL = 3;
@@ -312,40 +331,30 @@ int main(void)
 	  				break;
 	  			case 3://PID
 					Trajectory();
-					if(Pos <550)
+					if(CountSetpoint < 100)
 					{
-					  if(currentTime > timestamp3)
-					  {
-							Poscontrol.Error[NEW] = q_Pos-Pos;
-							Poscontrol.Output[NEW] = ((((Poscontrol.kp*Poscontrol.T)+(Poscontrol.ki*Poscontrol.T*Poscontrol.T)+(Poscontrol.kd))*Poscontrol.Error[NEW])-(((Poscontrol.kp*Poscontrol.T)+(Poscontrol.kd))*Poscontrol.Error[OLD])+(Poscontrol.kd*Poscontrol.Error[OLDER])+(Poscontrol.Output[OLD]*Poscontrol.T))/Poscontrol.T;
-							Poscontrol.Error[OLDER] = Poscontrol.Error[OLD];
-							Poscontrol.Error[OLD] = Poscontrol.Error[NEW];
-							Poscontrol.Output[OLDER] = Poscontrol.Output[OLD];
-							Poscontrol.Output[OLD] = Poscontrol.Output[NEW];
-
-							Velocontrol.Error[NEW] = Poscontrol.Output[NEW]+q_Velo-speed_fill;
-							Velocontrol.Output[NEW] = ((((Velocontrol.kp*Velocontrol.T)+(Velocontrol.ki*Velocontrol.T*Velocontrol.T)+(Velocontrol.kd))*Velocontrol.Error[NEW])-(((Velocontrol.kp*Velocontrol.T)+(Velocontrol.kd))*Velocontrol.Error[OLD])+(Velocontrol.kd*Velocontrol.Error[OLDER])+(Velocontrol.Output[OLD]*Velocontrol.T))/Velocontrol.T;
-							Velocontrol.Error[OLDER] = Velocontrol.Error[OLD];
-							Velocontrol.Error[OLD] = Velocontrol.Error[NEW];
-							Velocontrol.Output[OLDER] = Velocontrol.Output[OLD];
-							Velocontrol.Output[OLD] = Velocontrol.Output[NEW];
-					//					if(fabs(Pos_Target-Pos) <= 0.1)start = 0;
-							timestamp3 =currentTime + 100;
-					  }
-					  if(Velocontrol.Output[NEW] > 0)
-					  {
-						  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-						  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, Velocontrol.Output[NEW]);
-					  }
-					  else
-					  {
-						  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-						  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
-					  }
+						PIDposition();
 					}
 					else
 					{
-						state_ALL = 0;
+						if(state_ALL_Old == 5 || state_ALL_Old == 0)
+						{
+
+						HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+						__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+						reset();
+//						state_ALL = 6;
+						state_ALL = 2;
+						CountSetpoint = 0;
+						}
+						else
+						{
+						state_ALL = 2;
+						CountSetpoint = 0;
+						HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+						__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+						reset();
+						}
 
 					}
 	  				if(ButtonTest[0] == 0)//HOME Button
@@ -353,33 +362,139 @@ int main(void)
 						state_ALL = 0;
 						reset();
 					}
-	  				if(fabs(Pos-Pos_Target) <= 0.2)
+	  				if(fabs(Pos-Pos_Target) <= 0.2)//Limit
 	  				{
-	  					if(CountSetpoint < 100)
-	  					{
-	  						if(currentTime > timestamp5)
-						  {
-	  							CountSetpoint++;
-	  							timestamp5 =currentTime + 1000;
-						  }
-	  					}
-	  					else
-	  					{
-							state_ALL = 2;
-							HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-							__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-							reset();
-	  					}
-
+	  					if(currentTime > timestamp5)
+					  {
+							CountSetpoint++;
+							timestamp5 =currentTime + 1000;
+					  }
 	  				}
 	  				else
 	  				{
 	  					CountSetpoint = 0;
 	  				}
+
 	  				break;
 	  			case 4://TEST
-
+	  				Joy_State();
+	  				if(ButtonTest[1] == 0)
+	  				{
+	  					MemPos[0] = Pos;
+	  				}
+	  				if(ButtonTest[2] == 0)
+	  				{
+	  					MemPos[1] = Pos;
+	  				}
+	  				if(ButtonTest[3] == 0)
+					{
+	  					MemPos[2] = Pos;
+					}
+					if(ButtonTest[4] == 0)
+					{
+						MemPos[3] = Pos;
+					}
+					if(ButtonTest[5] == 0)
+					{
+						MemPos[4] = Pos;
+					}
+					if(ButtonTest[0] == 0)//HOME Button
+					{
+						state_ALL = 0;
+					}
 					break;
+	  			case 5://JOG MODE
+	  				Pos_Target = MemPos[i];
+	  				state_ALL = 3;
+	  				state_ALL_Old = 5;
+	  				i++;
+	  				if(i == 5)
+	  				{
+	  				state_ALL_Old = 0;
+	  				i = 0;
+	  				}
+
+	  				Velocontrol.Error[NEW] = 0;
+					Velocontrol.Error[OLD] = 0;
+					Velocontrol.Error[OLDER] = 0;
+					Velocontrol.Output[NEW] = 0;
+					Velocontrol.Output[OLD] = 0;
+					Velocontrol.Output[OLDER] = 0;
+
+					Poscontrol.Error[NEW] = 0;
+					Poscontrol.Error[OLD] = 0;
+					Poscontrol.Error[OLDER] = 0;
+					Poscontrol.Output[NEW] = 0;
+					Poscontrol.Output[OLD] = 0;
+					Poscontrol.Output[OLDER] = 0;
+					break;
+	  			case 6://Gripper
+	  				switch (state_Griper)
+	  				{
+	  					case 0:
+								if(LeadSW[1] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1))
+								{
+
+								}
+								else if(LeadSW[0] == 0)
+								{
+									if(CountGriper > 100)
+									{
+										state_Griper = 1;
+										CountGriper = 0;
+									}
+									else
+									{
+										static uint32_t timeGriper = 0;
+										if(timeGriper < HAL_GetTick())
+										{
+											CountGriper++;
+											timeGriper = HAL_GetTick()+10;
+										}
+
+									}
+
+								}
+	  						break;
+	  					case 1:
+	  							if(LeadSW[0] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1))
+								{
+
+								}
+	  							else if(LeadSW[1] == 0)
+								{
+	  								if(CountGriper > 100)
+									{
+	  									state_Griper = 0;
+										CountGriper = 0;
+										if(state_ALL_Old == 5)
+										{
+											state_ALL = 5;
+										}
+										else
+										{
+											state_ALL = 0;
+										}
+
+									}
+									else
+									{
+										static uint32_t timeGriper = 0;
+										if(timeGriper < HAL_GetTick())
+										{
+											CountGriper++;
+											timeGriper = HAL_GetTick()+10;
+										}
+
+									}
+
+								}
+
+	  						break;
+	  				}
+
+
+	  				break;
 	  			}
 //	  if(start == 1)
 //	  {
@@ -969,7 +1084,7 @@ static void MX_GPIO_Init(void)
                           |Vacuum_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, DirectionMotor_Pin|GPIO_PIN_1|LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, DirectionMotor_Pin|AnotherDMotor_Pin|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -977,17 +1092,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SWJoy_Pin Floor4_Pin */
-  GPIO_InitStruct.Pin = SWJoy_Pin|Floor4_Pin;
+  /*Configure GPIO pins : SWJoy_Pin LeadSW1_Pin Floor4_Pin */
+  GPIO_InitStruct.Pin = SWJoy_Pin|LeadSW1_Pin|Floor4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : Emergency_Read_Pin */
-  GPIO_InitStruct.Pin = Emergency_Read_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(Emergency_Read_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LAMP1_Pin LAMP2_Pin PULL_Pin PUSH_Pin
                            Vacuum_Pin */
@@ -998,30 +1107,30 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DirectionMotor_Pin PA1 LD2_Pin */
-  GPIO_InitStruct.Pin = DirectionMotor_Pin|GPIO_PIN_1|LD2_Pin;
+  /*Configure GPIO pins : DirectionMotor_Pin AnotherDMotor_Pin LD2_Pin */
+  GPIO_InitStruct.Pin = DirectionMotor_Pin|AnotherDMotor_Pin|LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LeadSW1_Pin */
-  GPIO_InitStruct.Pin = LeadSW1_Pin;
+  /*Configure GPIO pin : Emergency_Read_Pin */
+  GPIO_InitStruct.Pin = Emergency_Read_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(LeadSW1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(Emergency_Read_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LeadSW2_Pin */
-  GPIO_InitStruct.Pin = LeadSW2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(LeadSW2_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : Floor1_Pin Floor5_Pin */
-  GPIO_InitStruct.Pin = Floor1_Pin|Floor5_Pin;
+  /*Configure GPIO pins : LeadSW2_Pin Floor1_Pin Floor5_Pin */
+  GPIO_InitStruct.Pin = LeadSW2_Pin|Floor1_Pin|Floor5_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : ResetSW_Pin */
+  GPIO_InitStruct.Pin = ResetSW_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(ResetSW_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : Floor2_Pin Floor3_Pin HomeButton_Pin */
   GPIO_InitStruct.Pin = Floor2_Pin|Floor3_Pin|HomeButton_Pin;
@@ -1266,7 +1375,7 @@ void reset()
 	Poscontrol.Output[NEW] = 0;
 	Poscontrol.Output[OLD] = 0;
 	Poscontrol.Output[OLDER] = 0;
-	Pos_Start = 0;
+	Pos_Start = Pos;
 	Velo_Start = 0;
 	t = 0;
 }
@@ -1351,11 +1460,9 @@ void Trajectory()
 
 			  	  			  		state_Tra = 0;
 			  	  			  		t = 0;
-			  	  			  		Pos_Start = q_Pos;
+			  	  			  		Pos_Start = Pos;
 			  	  			  		Velo_Start = q_Velo;
 			  	  			  		Old_Target = Pos_Target;
-
-
 			  	  			  		Velocontrol.Error[NEW] = 0;
 									Velocontrol.Error[OLD] = 0;
 									Velocontrol.Error[OLDER] = 0;
@@ -1382,6 +1489,41 @@ void Trajectory()
 		  t = t+0.0001;
 		  timestamp_Traject = currentTime + 100;
 		  }
+}
+void PIDposition()
+{
+	static uint64_t timestamp3 =0;
+	int64_t currentTime = micros();
+	if(currentTime > timestamp3)
+	  {
+			Poscontrol.Error[NEW] = q_Pos-Pos;
+			Poscontrol.Output[NEW] = ((((Poscontrol.kp*Poscontrol.T)+(Poscontrol.ki*Poscontrol.T*Poscontrol.T)+(Poscontrol.kd))*Poscontrol.Error[NEW])-(((Poscontrol.kp*Poscontrol.T)+(Poscontrol.kd))*Poscontrol.Error[OLD])+(Poscontrol.kd*Poscontrol.Error[OLDER])+(Poscontrol.Output[OLD]*Poscontrol.T))/Poscontrol.T;
+			Poscontrol.Error[OLDER] = Poscontrol.Error[OLD];
+			Poscontrol.Error[OLD] = Poscontrol.Error[NEW];
+			Poscontrol.Output[OLDER] = Poscontrol.Output[OLD];
+			Poscontrol.Output[OLD] = Poscontrol.Output[NEW];
+
+			Velocontrol.Error[NEW] = Poscontrol.Output[NEW]+q_Velo-speed_fill;
+			Velocontrol.Output[NEW] = ((((Velocontrol.kp*Velocontrol.T)+(Velocontrol.ki*Velocontrol.T*Velocontrol.T)+(Velocontrol.kd))*Velocontrol.Error[NEW])-(((Velocontrol.kp*Velocontrol.T)+(Velocontrol.kd))*Velocontrol.Error[OLD])+(Velocontrol.kd*Velocontrol.Error[OLDER])+(Velocontrol.Output[OLD]*Velocontrol.T))/Velocontrol.T;
+			if(Velocontrol.Output[NEW]>42500)Velocontrol.Output[NEW]=42500;
+			if(Velocontrol.Output[NEW]<-42500)Velocontrol.Output[NEW]=-42500;
+			Velocontrol.Error[OLDER] = Velocontrol.Error[OLD];
+			Velocontrol.Error[OLD] = Velocontrol.Error[NEW];
+			Velocontrol.Output[OLDER] = Velocontrol.Output[OLD];
+			Velocontrol.Output[OLD] = Velocontrol.Output[NEW];
+	//					if(fabs(Pos_Target-Pos) <= 0.1)start = 0;
+			timestamp3 =currentTime + 100;
+	  }
+	  if(Velocontrol.Output[NEW] > 0)
+	  {
+		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, Velocontrol.Output[NEW]);
+	  }
+	  else
+	  {
+		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
+	  }
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
