@@ -26,3 +26,11 @@ output_Velo
 error_Pos
 Velocontrol
 Poscontrol
+ButtonTest
+state_ALL
+HOME
+test
+Pos_Start
+Velo_Start
+Count
+CountSetpoint

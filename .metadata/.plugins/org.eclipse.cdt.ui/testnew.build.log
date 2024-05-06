@@ -1,9 +1,9 @@
-18:10:09 **** Incremental Build of configuration Debug for project testnew ****
+20:50:31 **** Incremental Build of configuration Debug for project testnew ****
 make -j12 all 
 arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32G474xx -c -I../Core/Inc -I../Drivers/STM32G4xx_HAL_Driver/Inc -I../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
 ../Core/Src/main.c: In function 'main':
-../Core/Src/main.c:239:29: warning: passing argument 2 of 'HAL_ADC_Start_DMA' from incompatible pointer type [-Wincompatible-pointer-types]
-  239 |   HAL_ADC_Start_DMA(&hadc3, joyAnalogRead, 40);
+../Core/Src/main.c:221:29: warning: passing argument 2 of 'HAL_ADC_Start_DMA' from incompatible pointer type [-Wincompatible-pointer-types]
+  221 |   HAL_ADC_Start_DMA(&hadc3, joyAnalogRead, 40);
       |                             ^~~~~~~~~~~~~
       |                             |
       |                             uint16_t * {aka short unsigned int *}
@@ -14,43 +14,55 @@ In file included from ../Core/Inc/stm32g4xx_hal_conf.h:228,
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_adc.h:2242:78: note: expected 'uint32_t *' {aka 'long unsigned int *'} but argument is of type 'uint16_t *' {aka 'short unsigned int *'}
  2242 | HAL_StatusTypeDef       HAL_ADC_Start_DMA(ADC_HandleTypeDef *hadc, uint32_t *pData, uint32_t Length);
       |                                                                    ~~~~~~~~~~^~~~~
-../Core/Src/main.c:269:41: warning: implicit declaration of function 'fabs' [-Wimplicit-function-declaration]
-  269 |                   Pos   = ((QEIReadRaw-(fabs(Count)*57344))*25*3.14)/8192;
-      |                                         ^~~~
+In file included from ../Core/Inc/stm32g4xx_hal_conf.h:344:
+../Core/Src/main.c:343:96: warning: implicit declaration of function 'fabs' [-Wimplicit-function-declaration]
+  343 |                                                   __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
+      |                                                                                                ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
 ../Core/Src/main.c:21:1: note: include '<math.h>' or provide a declaration of 'fabs'
    20 | #include "main.h"
   +++ |+#include <math.h>
    21 | 
-../Core/Src/main.c:269:41: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
-  269 |                   Pos   = ((QEIReadRaw-(fabs(Count)*57344))*25*3.14)/8192;
+../Core/Src/main.c:343:96: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+  343 |                                                   __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
+      |                                                                                                ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:343:96: note: include '<math.h>' or provide a declaration of 'fabs'
+  343 |                                                   __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
+      |                                                                                                ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:356:44: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+  356 |                                         if(fabs(Pos-Pos_Target) <= 0.2)
+      |                                            ^~~~
+../Core/Src/main.c:356:44: note: include '<math.h>' or provide a declaration of 'fabs'
+../Core/Src/main.c: In function 'QEIEncoderPos_Update':
+../Core/Src/main.c:1075:41: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1075 |                 Pos     = ((QEIReadRaw-(fabs(Count)*57344))*25*3.14)/8192;
       |                                         ^~~~
-../Core/Src/main.c:269:41: note: include '<math.h>' or provide a declaration of 'fabs'
-In file included from ../Core/Inc/stm32g4xx_hal_conf.h:344:
-../Core/Src/main.c:325:56: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
-  325 |           __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
-      |                                                        ^~~~
-../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
- 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
-      |                                                                        ^~~~~~~~~~~
-../Core/Src/main.c:325:56: note: include '<math.h>' or provide a declaration of 'fabs'
-  325 |           __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
-      |                                                        ^~~~
-../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
- 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
-      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1075:41: note: include '<math.h>' or provide a declaration of 'fabs'
 ../Core/Src/main.c: In function 'Trajectory':
-../Core/Src/main.c:1224:62: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
- 1224 |                                                           if(fabs(q_Velo) >= Max_Velo)
+../Core/Src/main.c:1310:62: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1310 |                                                           if(fabs(q_Velo) >= Max_Velo)
       |                                                              ^~~~
-../Core/Src/main.c:1224:62: note: include '<math.h>' or provide a declaration of 'fabs'
-../Core/Src/main.c:1231:62: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
- 1231 |                                                           if(fabs((q_Pos-Pos_Start)*2) >= fabs(Pos_Target-Pos_Start))
+../Core/Src/main.c:1310:62: note: include '<math.h>' or provide a declaration of 'fabs'
+../Core/Src/main.c:1317:62: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1317 |                                                           if(fabs((q_Pos-Pos_Start)*2) >= fabs(Pos_Target-Pos_Start))
       |                                                              ^~~~
-../Core/Src/main.c:1231:62: note: include '<math.h>' or provide a declaration of 'fabs'
-../Core/Src/main.c:1259:62: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
- 1259 |                                                           if(fabs(q_Velo) <= 0)
+../Core/Src/main.c:1317:62: note: include '<math.h>' or provide a declaration of 'fabs'
+../Core/Src/main.c:1329:62: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1329 |                                                           if(fabs(Pos_Target-q_Pos) <= (q_Velo*q_Velo)/(2*Max_Acc))
       |                                                              ^~~~
-../Core/Src/main.c:1259:62: note: include '<math.h>' or provide a declaration of 'fabs'
+../Core/Src/main.c:1329:62: note: include '<math.h>' or provide a declaration of 'fabs'
+../Core/Src/main.c:1341:62: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1341 |                                                           if(fabs(q_Velo) <= 0)
+      |                                                              ^~~~
+../Core/Src/main.c:1341:62: note: include '<math.h>' or provide a declaration of 'fabs'
 arm-none-eabi-gcc -o "testnew.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Users\AAA\STM32CubeIDE\workspace_1.14.1\StudioOneDOFG.6\testnew\STM32G474RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="testnew.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 C:/ST/STM32CubeIDE_1.14.1/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.12.3.rel1.win32_1.0.100.202403111256/tools/bin/../lib/gcc/arm-none-eabi/12.3.1/../../../../arm-none-eabi/bin/ld.exe: warning: testnew.elf has a LOAD segment with RWX permissions
 Finished building target: testnew.elf
@@ -58,11 +70,11 @@ Finished building target: testnew.elf
 arm-none-eabi-size  testnew.elf 
 arm-none-eabi-objdump -h -S testnew.elf  > "testnew.list"
    text	   data	    bss	    dec	    hex	filename
-  41408	     48	   2952	  44408	   ad78	testnew.elf
+  41648	     48	   2784	  44480	   adc0	testnew.elf
 Finished building: default.size.stdout
  
 Finished building: testnew.list
  
 
-18:10:13 Build Finished. 0 errors, 8 warnings. (took 4s.128ms)
+20:50:35 Build Finished. 0 errors, 10 warnings. (took 4s.9ms)
 
