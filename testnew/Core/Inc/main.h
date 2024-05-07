@@ -74,10 +74,6 @@ void Error_Handler(void);
 #define DirectionMotor_GPIO_Port GPIOA
 #define AnotherDMotor_Pin GPIO_PIN_1
 #define AnotherDMotor_GPIO_Port GPIOA
-#define LPUART1_TX_Pin GPIO_PIN_2
-#define LPUART1_TX_GPIO_Port GPIOA
-#define LPUART1_RX_Pin GPIO_PIN_3
-#define LPUART1_RX_GPIO_Port GPIOA
 #define Emergency_Read_Pin GPIO_PIN_4
 #define Emergency_Read_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5

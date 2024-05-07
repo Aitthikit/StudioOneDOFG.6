@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "ModBusRTU.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,16 +43,42 @@
 ADC_HandleTypeDef hadc3;
 DMA_HandleTypeDef hdma_adc3;
 
-UART_HandleTypeDef hlpuart1;
-
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim5;
+TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim8;
+TIM_HandleTypeDef htim16;
+
+UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart2_rx;
+DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
+//ModBus
+ModbusHandleTypedef hmodbus;
+u16u8_t registerFrame[200];
+
+int Z_Moveing_Status=0b0000;
+float Z_Actual_Position=120;
+float Z_Moveing_Speed=120;
+float Z_Acceleration=120;
+float X_Actual_Position=120;
+
+int Mode = 0;
+
+int Vacuum_Status;
+int Gripper_Movement_Status;
+int Gripper_Movement_Actual_Status = 0b0000;
+int Shelve_Position[5];
+int Jogging_Status=0;
+int Goal_Point;
+int Pick_Order[5];
+int Place_Order[5];
+//ModBus
+
 //TEST
 int A = 2000;
 uint8_t B = 0;
@@ -64,14 +90,20 @@ int start = 0;
 int state_ALL = 2;
 int state_ALL_Old = 0;
 int state_Griper = 0;
+int state_Pick_Place = 0;
 int HOME = 0;
 int ButtonTest[6];
 int LeadSW[2];
 int CountSetpoint;
 int CountGriper;
+int CountVacuum;
+int CountHome;
+int VacuumNF;
 float MemPos[5];
 int Move[10] = {5,1,4,3,1,2,3,5,2,4};
 int i = 0;
+int Pick = 0;
+int Place = 0;
 //TEST
 
 //PID
@@ -156,7 +188,6 @@ NEW,OLD,OLDER
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
-static void MX_LPUART1_UART_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
@@ -164,17 +195,36 @@ static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_ADC3_Init(void);
+static void MX_USART2_UART_Init(void);
+static void MX_TIM16_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 uint64_t micros();
 void QEIEncoderVel_Update();
 void QEIEncoderPos_Update();
-void UARTInterruptConfig();
 void Joy_Averaged();
 void Joy_State();
 void Trajectory();
 void Motor();
 void reset();
 void PIDposition();
+void SensorRead();
+//ModBus
+void State_To_Mode();
+void Heartbeat();
+void Routine();
+void Vacuum();
+void GripperMovement();
+void SetShelves();
+void Run_Point_Mode();
+void SetHome();
+void Run_Jog_Mode();
+void UpdatePosRoutine();
+//ModBus
+
+//MATH
+void splitInteger(int number, int *digitsArray);
+//
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -211,7 +261,6 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_LPUART1_UART_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
@@ -219,15 +268,18 @@ int main(void)
   MX_TIM8_Init();
   MX_TIM5_Init();
   MX_ADC3_Init();
+  MX_USART2_UART_Init();
+  MX_TIM16_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start(&htim4);
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
   HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
+  HAL_TIM_Base_Start_IT(&htim6);
   HAL_TIM_Base_Start_IT(&htim5);
   HAL_ADCEx_Calibration_Start(&hadc3, ADC_SINGLE_ENDED);
   HAL_ADC_Start_DMA(&hadc3, joyAnalogRead, 40);
   _micros = 0;
-  UARTInterruptConfig();
 
 	Velocontrol.kp = 225;//180
 	Velocontrol.ki = 2;//25
@@ -238,6 +290,12 @@ int main(void)
 	Poscontrol.ki = 1.29;//4.5425,1.34
 	Poscontrol.kd = 0.000001;//0.0000021,0.0000004
 	Poscontrol.T = 0.0001;
+
+	hmodbus.huart = &huart2;
+	hmodbus.htim = &htim16;
+	hmodbus.slaveAddress = 0x15;
+	hmodbus.RegisterSize =200;
+	Modbus_init(&hmodbus, registerFrame);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -247,6 +305,21 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  //ModBus
+	  Modbus_Protocal_Worker();
+	  State_To_Mode();
+	  UpdatePosRoutine();
+//	  Routine();
+//	  Vacuum();
+//	  GripperMovement();
+//	  SetShelves();
+//	  Run_Point_Mode();
+//	  SetHome();
+//	  Run_Jog_Mode();
+	  //ModBus
+
+
+
 	  //Timer SET
 	  int64_t currentTime = micros();
 	  static uint64_t timestamp =0;
@@ -259,40 +332,13 @@ int main(void)
 		timestamp =currentTime + 100;//us
 		}
 //	  Joy_State();
-	ButtonTest[0] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10);
-	ButtonTest[1] = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_10);
-	ButtonTest[2] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8);
-	ButtonTest[3] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_9);
-	ButtonTest[4] = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_7);
-	ButtonTest[5] = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6);
-	LeadSW[0] = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
-	LeadSW[1] = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_1);
-	test = LeadSW[1] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1);
-	test2 = LeadSW[0] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1);
+		SensorRead();
+
+
 	  switch (state_ALL)
 	  			{
 	  			case 0://HOME
-	  				test = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5);
-					if(HOME == 1||HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1)
-					{
-						HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-						__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-						HAL_Delay(1000);
-						HOME = 0;
-						__HAL_TIM_SET_COUNTER(&htim3,0);
-						Count = 0;
-						QEIdata.Position[NEW] = 0;
-						QEIdata.Position[OLD] = 0;
-						Pos_Start = 0;
-						state_ALL = 2;
-						state_Tra = 0;
-						break;
-					}
-					else
-					{
-					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-					__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 7500);
-					}
+	  				SetHome();
 	  				break;
 	  			case 1://Standby
 	  				if(start == 1)//MODBUS HERE
@@ -314,6 +360,7 @@ int main(void)
 	  				if(ButtonTest[0] == 0)//HOME Button
 					{
 						state_ALL = 0;
+						Mode = 0;
 					}
 	  				if(ButtonTest[1] == 0)
 					{
@@ -330,103 +377,250 @@ int main(void)
 	  				}
 	  				break;
 	  			case 3://PID
-					Trajectory();
-					if(CountSetpoint < 100)
-					{
-						PIDposition();
-					}
-					else
-					{
-						if(state_ALL_Old == 5 || state_ALL_Old == 0)
+	  				if(Mode == 1)
+	  				{
+	  					Trajectory();
+						if(CountSetpoint < 100)
 						{
-
-						HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-						__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-						reset();
-//						state_ALL = 6;
-						state_ALL = 2;
-						CountSetpoint = 0;
+							PIDposition();
 						}
 						else
 						{
-						state_ALL = 2;
-						CountSetpoint = 0;
-						HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-						__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-						reset();
-						}
+							if(state_ALL_Old == 5 || state_ALL_Old == 0 || state_ALL_Old == 7 || state_ALL_Old == 8)
+							{
+							HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+							__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+							reset();
+							state_ALL = 6;
+	//						state_ALL = 2;
+							CountSetpoint = 0;
+							}
+							else
+							{
+							state_ALL = 2;
+							CountSetpoint = 0;
+							HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+							__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+							reset();
+							}
+							registerFrame[0x10].U16 = 0b0000;
 
-					}
-	  				if(ButtonTest[0] == 0)//HOME Button
-					{
-						state_ALL = 0;
-						reset();
-					}
-	  				if(fabs(Pos-Pos_Target) <= 0.2)//Limit
-	  				{
-	  					if(currentTime > timestamp5)
-					  {
-							CountSetpoint++;
-							timestamp5 =currentTime + 1000;
-					  }
+						}
+						if(ButtonTest[0] == 0)//HOME Button
+						{
+							state_ALL = 0;
+							Mode = 0;
+							reset();
+						}
+						if(fabs(Pos-Pos_Target) <= 0.2)//Limit
+						{
+							if(currentTime > timestamp5)
+						  {
+								CountSetpoint++;
+								timestamp5 =currentTime + 1000;
+						  }
+						}
+						else
+						{
+							CountSetpoint = 0;
+						}
 	  				}
 	  				else
 	  				{
-	  					CountSetpoint = 0;
+	  					Trajectory();
+						if(CountSetpoint < 100)
+						{
+							PIDposition();
+						}
+						else
+						{
+							if(state_ALL_Old == 5 || state_ALL_Old == 0)
+							{
+							HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+							__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+							reset();
+							state_ALL = 6;
+	//						state_ALL = 2;
+							CountSetpoint = 0;
+							}
+							else
+							{
+							state_ALL = 2;
+							CountSetpoint = 0;
+							HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+							__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+							reset();
+							}
+
+						}
+						if(ButtonTest[0] == 0)//HOME Button
+						{
+							state_ALL = 0;
+							Mode = 0;
+							reset();
+						}
+						if(fabs(Pos-Pos_Target) <= 0.2)//Limit
+						{
+							if(currentTime > timestamp5)
+						  {
+								CountSetpoint++;
+								timestamp5 =currentTime + 1000;
+						  }
+						}
+						else
+						{
+							CountSetpoint = 0;
+						}
 	  				}
 
 	  				break;
 	  			case 4://TEST
 	  				Joy_State();
-	  				if(ButtonTest[1] == 0)
+	  				if(Mode == 1)
 	  				{
-	  					MemPos[0] = Pos;
+						if(ButtonTest[1] == 0)
+						{
+							registerFrame[0x23].U16 = Pos*10;
+							MemPos[0] = Pos;
+						}
+						if(ButtonTest[2] == 0)
+						{
+							registerFrame[0x24].U16 = Pos*10;
+							MemPos[1] = Pos;
+						}
+						if(ButtonTest[3] == 0)
+						{
+							registerFrame[0x25].U16 = Pos*10;
+							MemPos[2] = Pos;
+						}
+						if(ButtonTest[4] == 0)
+						{
+							registerFrame[0x26].U16 = Pos*10;
+							MemPos[3] = Pos;
+						}
+						if(ButtonTest[5] == 0)
+						{
+							registerFrame[0x27].U16 = Pos*10;
+							MemPos[4] = Pos;
+						}
+						if(ButtonTest[0] == 0)//HOME Button
+						{
+							registerFrame[0x10].U16 = 0b0000;
+							Mode = 0;
+							state_ALL = 0;
+						}
 	  				}
-	  				if(ButtonTest[2] == 0)
+	  				else
 	  				{
-	  					MemPos[1] = Pos;
+	  					if(ButtonTest[1] == 0)
+						{
+							MemPos[0] = Pos;
+						}
+						if(ButtonTest[2] == 0)
+						{
+							MemPos[1] = Pos;
+						}
+						if(ButtonTest[3] == 0)
+						{
+							MemPos[2] = Pos;
+						}
+						if(ButtonTest[4] == 0)
+						{
+							MemPos[3] = Pos;
+						}
+						if(ButtonTest[5] == 0)
+						{
+							MemPos[4] = Pos;
+						}
+						if(ButtonTest[0] == 0)//HOME Button
+						{
+							state_ALL = 0;
+							Mode = 0;
+						}
 	  				}
-	  				if(ButtonTest[3] == 0)
-					{
-	  					MemPos[2] = Pos;
-					}
-					if(ButtonTest[4] == 0)
-					{
-						MemPos[3] = Pos;
-					}
-					if(ButtonTest[5] == 0)
-					{
-						MemPos[4] = Pos;
-					}
-					if(ButtonTest[0] == 0)//HOME Button
-					{
-						state_ALL = 0;
-					}
 					break;
 	  			case 5://JOG MODE
-	  				Pos_Target = MemPos[i];
-	  				state_ALL = 3;
-	  				state_ALL_Old = 5;
-	  				i++;
-	  				if(i == 5)
+	  				if(Mode == 1)
 	  				{
-	  				state_ALL_Old = 0;
-	  				i = 0;
+	  					switch(state_Pick_Place){
+	  						case 0:
+	  							registerFrame[0x10].U16 == 0b0100;
+	  							Pos_Target = MemPos[Pick_Order[Pick]-1];
+	  							Pick++;
+	  							state_ALL = 3;
+								state_ALL_Old = 7;
+	  							state_Pick_Place = 1;
+	  							Velocontrol.Error[NEW] = 0;
+								Velocontrol.Error[OLD] = 0;
+								Velocontrol.Error[OLDER] = 0;
+								Velocontrol.Output[NEW] = 0;
+								Velocontrol.Output[OLD] = 0;
+								Velocontrol.Output[OLDER] = 0;
+
+								Poscontrol.Error[NEW] = 0;
+								Poscontrol.Error[OLD] = 0;
+								Poscontrol.Error[OLDER] = 0;
+								Poscontrol.Output[NEW] = 0;
+								Poscontrol.Output[OLD] = 0;
+								Poscontrol.Output[OLDER] = 0;
+	  							break;
+	  						case 1:
+	  							registerFrame[0x10].U16 == 0b1000;
+	  							Pos_Target = MemPos[Place_Order[Place]-1];
+	  							Place++;
+	  							state_ALL = 3;
+								state_ALL_Old = 8;
+	  							state_Pick_Place = 0;
+	  							if(Place == 5)
+	  							{
+	  								state_ALL = 0;
+	  								Mode = 0;
+	  								registerFrame[0x10].U16 = 0b0000;
+	  							}
+	  							Velocontrol.Error[NEW] = 0;
+								Velocontrol.Error[OLD] = 0;
+								Velocontrol.Error[OLDER] = 0;
+								Velocontrol.Output[NEW] = 0;
+								Velocontrol.Output[OLD] = 0;
+								Velocontrol.Output[OLDER] = 0;
+
+								Poscontrol.Error[NEW] = 0;
+								Poscontrol.Error[OLD] = 0;
+								Poscontrol.Error[OLDER] = 0;
+								Poscontrol.Output[NEW] = 0;
+								Poscontrol.Output[OLD] = 0;
+								Poscontrol.Output[OLDER] = 0;
+	  							break;
+
+
+	  					}
 	  				}
+	  				else
+	  				{
+	  					Pos_Target = MemPos[i];
+						state_ALL = 3;
+						state_ALL_Old = 5;
+						i++;
+						if(i == 5)
+						{
+						state_ALL_Old = 0;
+						i = 0;
+						}
 
-	  				Velocontrol.Error[NEW] = 0;
-					Velocontrol.Error[OLD] = 0;
-					Velocontrol.Error[OLDER] = 0;
-					Velocontrol.Output[NEW] = 0;
-					Velocontrol.Output[OLD] = 0;
-					Velocontrol.Output[OLDER] = 0;
+						Velocontrol.Error[NEW] = 0;
+						Velocontrol.Error[OLD] = 0;
+						Velocontrol.Error[OLDER] = 0;
+						Velocontrol.Output[NEW] = 0;
+						Velocontrol.Output[OLD] = 0;
+						Velocontrol.Output[OLDER] = 0;
 
-					Poscontrol.Error[NEW] = 0;
-					Poscontrol.Error[OLD] = 0;
-					Poscontrol.Error[OLDER] = 0;
-					Poscontrol.Output[NEW] = 0;
-					Poscontrol.Output[OLD] = 0;
-					Poscontrol.Output[OLDER] = 0;
+						Poscontrol.Error[NEW] = 0;
+						Poscontrol.Error[OLD] = 0;
+						Poscontrol.Error[OLDER] = 0;
+						Poscontrol.Output[NEW] = 0;
+						Poscontrol.Output[OLD] = 0;
+						Poscontrol.Output[OLDER] = 0;
+	  				}\
 					break;
 	  			case 6://Gripper
 	  				switch (state_Griper)
@@ -434,7 +628,7 @@ int main(void)
 	  					case 0:
 								if(LeadSW[1] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1))
 								{
-
+									//PUSH
 								}
 								else if(LeadSW[0] == 0)
 								{
@@ -457,9 +651,48 @@ int main(void)
 								}
 	  						break;
 	  					case 1:
+								if(CountVacuum < 500)
+								{
+									//ON-OFF Vacuum
+									if(state_ALL_Old == 7)
+									{
+										//ON_Vacuum
+									}
+									if(state_ALL_Old == 8)
+									{
+										//OFF_Vacuum
+									}
+									else
+									{
+										if(VacuumNF == 1)
+										{
+											//ON_Vacuum
+											VacuumNF = 0;
+										}
+										else
+										{
+											//OFF_Vacuum
+											VacuumNF = 1;
+										}
+									}
+
+								}
+								else
+								{
+									state_Griper = 2;
+									CountVacuum = 0;
+								}
+								static uint32_t timeVacuum = 0;
+								if(timeVacuum < HAL_GetTick())
+								{
+									CountVacuum++;
+									timeVacuum = HAL_GetTick()+10;
+								}
+								break;
+	  					case 2:
 	  							if(LeadSW[0] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1))
 								{
-
+	  								//PULL
 								}
 	  							else if(LeadSW[1] == 0)
 								{
@@ -474,6 +707,7 @@ int main(void)
 										else
 										{
 											state_ALL = 0;
+											Mode = 0;
 										}
 
 									}
@@ -491,94 +725,12 @@ int main(void)
 								}
 
 	  						break;
+
 	  				}
 
 
 	  				break;
 	  			}
-//	  if(start == 1)
-//	  {
-//		  Trajectory();
-//		  if(Pos <500)
-//		  {
-//			  if(currentTime > timestamp3)
-//			  {
-//					Poscontrol.Error[NEW] = q_Pos-Pos;
-//					Poscontrol.Output[NEW] = ((((Poscontrol.kp*Poscontrol.T)+(Poscontrol.ki*Poscontrol.T*Poscontrol.T)+(Poscontrol.kd))*Poscontrol.Error[NEW])-(((Poscontrol.kp*Poscontrol.T)+(Poscontrol.kd))*Poscontrol.Error[OLD])+(Poscontrol.kd*Poscontrol.Error[OLDER])+(Poscontrol.Output[OLD]*Poscontrol.T))/Poscontrol.T;
-//					Poscontrol.Error[OLDER] = Poscontrol.Error[OLD];
-//					Poscontrol.Error[OLD] = Poscontrol.Error[NEW];
-//					Poscontrol.Output[OLDER] = Poscontrol.Output[OLD];
-//					Poscontrol.Output[OLD] = Poscontrol.Output[NEW];
-//
-//					Velocontrol.Error[NEW] = Poscontrol.Output[NEW]+q_Velo-speed_fill;
-//					Velocontrol.Output[NEW] = ((((Velocontrol.kp*Velocontrol.T)+(Velocontrol.ki*Velocontrol.T*Velocontrol.T)+(Velocontrol.kd))*Velocontrol.Error[NEW])-(((Velocontrol.kp*Velocontrol.T)+(Velocontrol.kd))*Velocontrol.Error[OLD])+(Velocontrol.kd*Velocontrol.Error[OLDER])+(Velocontrol.Output[OLD]*Velocontrol.T))/Velocontrol.T;
-//					Velocontrol.Error[OLDER] = Velocontrol.Error[OLD];
-//					Velocontrol.Error[OLD] = Velocontrol.Error[NEW];
-//					Velocontrol.Output[OLDER] = Velocontrol.Output[OLD];
-//					Velocontrol.Output[OLD] = Velocontrol.Output[NEW];
-////					if(fabs(Pos_Target-Pos) <= 0.1)start = 0;
-//					timestamp3 =currentTime + 100;
-//			  }
-//			  if(Velocontrol.Output[NEW] > 0)
-//			  {
-//				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-//				  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, Velocontrol.Output[NEW]);
-//			  }
-//			  else
-//			  {
-//				  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-//				  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
-//			  }
-//		  }
-//		  else
-//		  {
-//			  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-//			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-//
-//		  }
-//	  }
-//	  else if(start == 2)
-//	  {
-//		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-//		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-//		Velocontrol.Error[NEW] = 0;
-//		Velocontrol.Error[OLD] = 0;
-//		Velocontrol.Error[OLDER] = 0;
-//		Velocontrol.Output[NEW] = 0;
-//		Velocontrol.Output[OLD] = 0;
-//		Velocontrol.Output[OLDER] = 0;
-//
-//		Poscontrol.Error[NEW] = 0;
-//		Poscontrol.Error[OLD] = 0;
-//		Poscontrol.Error[OLDER] = 0;
-//		Poscontrol.Output[NEW] = 0;
-//		Poscontrol.Output[OLD] = 0;
-//		Poscontrol.Output[OLDER] = 0;
-//		t = 0;
-//		if(currentTime > timestamp5)
-//		{
-//			HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-//			timestamp5 =currentTime + 200000;
-//		}
-//	  }
-//	  else
-//	  {
-//		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-//		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-//	  }
-
-
-
-	  //	  if(currentTime > timestamp3)
-	  //	  {
-	  //	  dataSend = RPSspeed;
-	  //	  dataBytes[0] = header; // Header byte
-	  //	  dataBytes[1] = (uint8_t)(dataSend & 0xFF); // Lower byte
-	  //	  dataBytes[2] = (uint8_t)((dataSend >> 8) & 0xFF); // Upper byte
-	  //	  dataBytes[3] = 0x0A;
-	  //	  HAL_UART_Transmit(&hlpuart1, dataBytes, sizeof(dataBytes), 10);
-	  //	  timestamp3 =currentTime + 1000;
-	  //	  }
   }
   /* USER CODE END 3 */
 }
@@ -703,53 +855,6 @@ static void MX_ADC3_Init(void)
   /* USER CODE BEGIN ADC3_Init 2 */
 
   /* USER CODE END ADC3_Init 2 */
-
-}
-
-/**
-  * @brief LPUART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_LPUART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN LPUART1_Init 0 */
-
-  /* USER CODE END LPUART1_Init 0 */
-
-  /* USER CODE BEGIN LPUART1_Init 1 */
-
-  /* USER CODE END LPUART1_Init 1 */
-  hlpuart1.Instance = LPUART1;
-  hlpuart1.Init.BaudRate = 115200;
-  hlpuart1.Init.WordLength = UART_WORDLENGTH_8B;
-  hlpuart1.Init.StopBits = UART_STOPBITS_1;
-  hlpuart1.Init.Parity = UART_PARITY_NONE;
-  hlpuart1.Init.Mode = UART_MODE_TX_RX;
-  hlpuart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  hlpuart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  hlpuart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  hlpuart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&hlpuart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetTxFifoThreshold(&hlpuart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetRxFifoThreshold(&hlpuart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_DisableFifoMode(&hlpuart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN LPUART1_Init 2 */
-
-  /* USER CODE END LPUART1_Init 2 */
 
 }
 
@@ -999,6 +1104,44 @@ static void MX_TIM5_Init(void)
 }
 
 /**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 16999;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 1999;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
+
+}
+
+/**
   * @brief TIM8 Initialization Function
   * @param None
   * @retval None
@@ -1046,6 +1189,90 @@ static void MX_TIM8_Init(void)
 }
 
 /**
+  * @brief TIM16 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM16_Init(void)
+{
+
+  /* USER CODE BEGIN TIM16_Init 0 */
+
+  /* USER CODE END TIM16_Init 0 */
+
+  /* USER CODE BEGIN TIM16_Init 1 */
+
+  /* USER CODE END TIM16_Init 1 */
+  htim16.Instance = TIM16;
+  htim16.Init.Prescaler = 169;
+  htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim16.Init.Period = 1145;
+  htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim16.Init.RepetitionCounter = 0;
+  htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim16) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_OnePulse_Init(&htim16, TIM_OPMODE_SINGLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM16_Init 2 */
+
+  /* USER CODE END TIM16_Init 2 */
+
+}
+
+/**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 19200;
+  huart2.Init.WordLength = UART_WORDLENGTH_9B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_EVEN;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart2.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart2, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -1056,9 +1283,15 @@ static void MX_DMA_Init(void)
   __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Channel1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
   /* DMA1_Channel2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
+  /* DMA1_Channel3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);
 
 }
 
@@ -1165,6 +1398,11 @@ if(htim == &htim5)
 {
 _micros += UINT32_MAX;
 }
+if(htim == &htim6)
+{
+	Heartbeat();
+	Routine();
+}
 }
 
 uint64_t micros()
@@ -1211,9 +1449,14 @@ float diffTime = (QEIdata.TimeStamp[NEW]-QEIdata.TimeStamp[OLD]) * 0.000001;
 QEIdata.QEIAngularVelocity = diffPosition / diffTime;
 RPSspeed = ((QEIdata.QEIAngularVelocity)/8192)*60;
 speed = ((QEIdata.QEIAngularVelocity)/8192)*12.5*2*3.14;
+
+
 speed_fill = (0.969*speed_fill_1)+(0.0155*speed)+(0.0155*speed_1);
 speed_1 = speed;
 speed_fill_1 = speed_fill;
+
+
+
 if(speed_fill>MAXspeed)
 {
 	MAXspeed = speed_fill;
@@ -1223,25 +1466,9 @@ QEIdata.Position[OLD] = QEIdata.Position[NEW];
 QEIdata.TimeStamp[OLD]=QEIdata.TimeStamp[NEW];
 }
 
-void UARTInterruptConfig()
-{
-	HAL_UART_Receive_IT(&hlpuart1, Rx,4);
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-
-	if(huart == &hlpuart1)
-	{
-		Rx[4] = '\0';
-		HAL_UART_Receive_IT(&hlpuart1, Rx, 4);
-	}
-}
-
 void Joy_State()
 {
 joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
-
 if(state == 0)
 {
 //	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
@@ -1525,6 +1752,259 @@ void PIDposition()
 		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
 	  }
 }
+
+
+
+
+
+void State_To_Mode(){
+	static uint32_t timestamp = 0;
+	if (timestamp < HAL_GetTick()) {
+        timestamp = HAL_GetTick() + 200;
+        if(registerFrame[0x01].U16 == 0b0001){
+        	registerFrame[0x01].U16 = 0b0000;
+			registerFrame[0x10].U16 = 0b0001;
+        	Mode = 1;
+        	state_ALL = 4;
+        }
+        if(registerFrame[0x01].U16 == 0b0010){
+//            Mode = 2;
+        	Mode = 1;
+            state_ALL = 0;
+        }
+        if(registerFrame[0x01].U16 == 0b0100){
+//            Mode = 3;
+        	Mode = 1;
+        	registerFrame[0x01].U16 = 0b0000;
+			splitInteger(registerFrame[0x21].U16, Pick_Order);
+			splitInteger(registerFrame[0x22].U16, Place_Order);
+			state_ALL = 5;
+        }
+        if(registerFrame[0x01].U16 == 0b1000){
+//          Point Mode
+        	Mode = 1;
+        	registerFrame[0x01].U16 = 0b0000;
+			registerFrame[0x10].U16 = 0b00010000;
+			Goal_Point = registerFrame[0x30].U16/10;
+			Pos_Target = Goal_Point;
+			state_ALL = 3;
+			state_ALL_Old = 2;
+        }
+	}
+}
+
+void Heartbeat(){
+        registerFrame[0x00].U16 =22881;
+    }
+
+void Routine () {
+        if (registerFrame[0x00].U16 == 18537){
+            registerFrame[0x04].U16 = Gripper_Movement_Actual_Status;
+
+            registerFrame[0x10].U16 = 0b0001;
+            registerFrame[0x10].U16 = 0b0000;
+        }
+}
+void UpdatePosRoutine()
+{
+	registerFrame[0x11].U16 = fabs(Pos)*10;
+	registerFrame[0x12].U16 = fabs(speed_fill)*10;
+	registerFrame[0x13].U16 = Z_Acceleration*10;
+	registerFrame[0x40].U16 = X_Actual_Position*10;
+}
+
+void Vacuum() {
+    static uint32_t timestamp = 0;
+    if (timestamp < HAL_GetTick()){
+        timestamp = HAL_GetTick() + 200;
+        Vacuum_Status = registerFrame[0x02].U16;
+    }
+}
+
+//Write Gripper Movement Status
+void GripperMovement() {
+    static uint32_t timestamp = 0;
+    if (timestamp < HAL_GetTick()){
+        timestamp = HAL_GetTick() + 200;
+        Gripper_Movement_Status = registerFrame[0x03].U16;
+    }
+}
+
+void SetShelves() {
+        if (Mode == 1){
+        	registerFrame[0x01].U16 = 0b0000;
+        	Mode=0;
+        	registerFrame[0x10].U16 = 0b0001;
+
+        	registerFrame[0x23].U16 = Shelve_Position[0];
+        	registerFrame[0x24].U16 = Shelve_Position[1];
+        	registerFrame[0x25].U16 = Shelve_Position[2];
+        	registerFrame[0x26].U16 = Shelve_Position[3];
+        	registerFrame[0x27].U16 = Shelve_Position[4];
+
+//        	HAL_Delay(300);//Test Reset
+
+			registerFrame[0x10].U16 = 0b0000;
+			Mode = 0;
+        }
+    }
+
+void Run_Point_Mode() {
+
+        if (Mode==4){
+        	registerFrame[0x01].U16 = 0b0000;
+        	Mode=0;
+        	registerFrame[0x10].U16 = 0b10000;
+        	Goal_Point = registerFrame[0x30].U16/10;
+        	Pos_Target = Goal_Point;
+        	Mode = 1;
+		}
+
+        	//ใส่คำสั่งให้หุ่นเคลื่อนที่ไป Goal_Point
+
+        	//ถึงGoal_Point�?ล้ว
+//        	HAL_Delay(300);//Test Reset
+        	registerFrame[0x10].U16 = 0b0000;
+        	Mode = 0;
+    }
+
+void SetHome() {
+	if(Mode == 1)
+		{
+			registerFrame[0x01].U16 = 0b0000;
+			registerFrame[0x10].U16 = 0b0010;
+			test = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5);
+			if(HOME == 1||HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1)
+			{
+				if(CountHome > 100)
+				{
+					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+					__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+					HAL_Delay(1000);
+					HOME = 0;
+					__HAL_TIM_SET_COUNTER(&htim3,0);
+					Count = 0;
+					QEIdata.Position[NEW] = 0;
+					QEIdata.Position[OLD] = 0;
+					Pos_Start = 0;
+					state_ALL = 2;
+					state_Tra = 0;
+					CountHome = 0;
+					registerFrame[0x10].U16 = 0b0000;//Reset ModBus
+				}
+				else
+				{
+					CountHome++;
+				}
+			}
+			else
+			{
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 7500);
+			CountHome = 0;
+			}
+		}
+		else
+		{
+			test = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5);
+			if(HOME == 1||HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1)
+			{
+				if(CountHome > 100)
+				{
+					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+					__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+					HAL_Delay(1000);
+					HOME = 0;
+					__HAL_TIM_SET_COUNTER(&htim3,0);
+					Count = 0;
+					QEIdata.Position[NEW] = 0;
+					QEIdata.Position[OLD] = 0;
+					Pos_Start = 0;
+					state_ALL = 2;
+					state_Tra = 0;
+					CountHome = 0;
+				}
+				else
+				{
+					CountHome++;
+				}
+			}
+			else
+			{
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 7500);
+			CountHome = 0;
+			}
+		}
+    }
+
+void Run_Jog_Mode() {
+    static uint32_t timestamp = 0;
+    if (timestamp < HAL_GetTick()){
+        timestamp = HAL_GetTick() + 200;
+        if (Mode == 3){
+        	registerFrame[0x01].U16 = 0b0000;
+//
+//        	Pick_Order = registerFrame[0x21].U16;
+//        	Place_Order = registerFrame[0x22].U16;
+//        	int i;
+//        	for (i = 0; i < 5; i++) {
+//
+//        		//ใส่คำสั่งPickไปที่ Pick_Order[i]
+//
+//        		registerFrame[0x10].U16 == 0b0100;
+//
+//        		//ใส่คำสั่งPlaceไปที่ Place_Order[i]
+//
+//        		registerFrame[0x10].U16 == 0b1000;
+//
+//
+//
+//        	}
+        	//ถ้าjoggingเสร็จ�?ล้วset Moving Status = 0
+        	registerFrame[0x10].U16 = 0b0000;
+        	Mode = 0;
+		}
+    }
+}
+
+void splitInteger(int number, int *digitsArray) {
+    int temp = number;
+    for (int b = 0; b < 5; b++) {
+        digitsArray[4 - b] = temp % 10;  // Getting the last digit
+        temp /= 10;  // Removing the last digit
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void SensorRead()
+{
+	ButtonTest[0] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10);
+	ButtonTest[1] = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_10);
+	ButtonTest[2] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8);
+	ButtonTest[3] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_9);
+	ButtonTest[4] = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_7);
+	ButtonTest[5] = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6);
+	LeadSW[0] = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
+	LeadSW[1] = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_1);
+	test = LeadSW[1] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1);
+	test2 = LeadSW[0] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1);
+}
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == GPIO_PIN_13)

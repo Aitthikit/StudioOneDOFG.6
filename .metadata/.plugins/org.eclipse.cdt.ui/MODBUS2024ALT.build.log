@@ -1,0 +1,10 @@
+12:06:08 **** Incremental Build of configuration Debug for project MODBUS2024ALT ****
+make -j12 all 
+arm-none-eabi-size  MODBUS2024ALT.elf 
+   text	   data	    bss	    dec	    hex	filename
+  24348	    568	   3880	  28796	   707c	MODBUS2024ALT.elf
+Finished building: default.size.stdout
+ 
+
+12:06:08 Build Finished. 0 errors, 0 warnings. (took 376ms)
+
