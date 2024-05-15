@@ -62,10 +62,10 @@ ModbusHandleTypedef hmodbus;
 u16u8_t registerFrame[200];
 
 int Z_Moveing_Status=0b0000;
-float Z_Actual_Position=120;
-float Z_Moveing_Speed=120;
-float Z_Acceleration=120;
-float X_Actual_Position=120;
+float Z_Actual_Position= 0;
+float Z_Moveing_Speed= 0;
+float Z_Acceleration= 0;
+float X_Actual_Position= 0;
 
 int Mode = 0;
 
@@ -89,6 +89,7 @@ int Maxtest=0;
 int start = 0;
 int state_ALL = 2;
 int state_ALL_Old = 0;
+int state_ALL_Freeze = 0;
 int state_Griper = 0;
 int state_Pick_Place = 0;
 int HOME = 0;
@@ -98,12 +99,16 @@ int CountSetpoint;
 int CountGriper;
 int CountVacuum;
 int CountHome;
+int CountProxi;
 int VacuumNF;
 float MemPos[5];
 int Move[10] = {5,1,4,3,1,2,3,5,2,4};
 int i = 0;
 int Pick = 0;
 int Place = 0;
+int emer;
+int resetBut;
+int FirstTraject = 1;
 //TEST
 
 //PID
@@ -162,6 +167,7 @@ float MAXspeed;
 float speed_fill;
 float speed_fill_1;
 float Pos;
+float Accelation;
 double pulse;
 
 //Encoder
@@ -174,6 +180,7 @@ uint32_t Position[2];
 uint64_t TimeStamp[2];
 float QEIPostion_1turn;
 float QEIAngularVelocity;
+float QEIAngularAccelation;
 }QEI_StructureTypeDef;
 QEI_StructureTypeDef QEIdata = {0};
 uint64_t _micros = 0;
@@ -207,8 +214,11 @@ void Joy_State();
 void Trajectory();
 void Motor();
 void reset();
+void PIDreset();
 void PIDposition();
 void SensorRead();
+void ButtonMem();
+void Stopper();
 //ModBus
 void State_To_Mode();
 void Heartbeat();
@@ -281,14 +291,14 @@ int main(void)
   HAL_ADC_Start_DMA(&hadc3, joyAnalogRead, 40);
   _micros = 0;
 
-	Velocontrol.kp = 225;//180
-	Velocontrol.ki = 2;//25
+	Velocontrol.kp = 170;//225;//180
+	Velocontrol.ki = 0;//2;//25
 	Velocontrol.kd = 0;
 	Velocontrol.T = 0.0001;
 
-	Poscontrol.kp = 0.5667;//2.015,0.6
-	Poscontrol.ki = 1.29;//4.5425,1.34
-	Poscontrol.kd = 0.000001;//0.0000021,0.0000004
+	Poscontrol.kp = 1;//0.5667;//2.015,0.6
+	Poscontrol.ki = 0.4;//1.29;//4.5425,1.34
+	Poscontrol.kd = 0.0000007;//0.000001;//0.0000021,0.0000004
 	Poscontrol.T = 0.0001;
 
 	hmodbus.huart = &huart2;
@@ -309,31 +319,41 @@ int main(void)
 	  Modbus_Protocal_Worker();
 	  State_To_Mode();
 	  UpdatePosRoutine();
-//	  Routine();
-//	  Vacuum();
-//	  GripperMovement();
-//	  SetShelves();
-//	  Run_Point_Mode();
-//	  SetHome();
-//	  Run_Jog_Mode();
+	  Vacuum();
+	  GripperMovement();
+//	  Stopper();
+//	  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 10000);
+//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0,1);
+//	  HAL_Delay(1000);
+//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0,0);
+//	  HAL_Delay(1000);
+//	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_3);//idle
+//	  HAL_Delay(1000);
+//	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_2);//run
+//	  HAL_Delay(1000);
+//	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_5);//PULL/PUSH
+//	  HAL_Delay(1000);
+//	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);//Vacuum
+//	  HAL_Delay(1000);
+//	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);//PULL/PUSH
+//	  HAL_Delay(1000);
 	  //ModBus
-
-
 
 	  //Timer SET
 	  int64_t currentTime = micros();
 	  static uint64_t timestamp =0;
 	  static uint64_t timestamp5 =0;
 	  //Timer SET
-		if(currentTime > timestamp)
-		{
-		QEIEncoderPos_Update();
-		QEIEncoderVel_Update();
-		timestamp =currentTime + 100;//us
-		}
-//	  Joy_State();
-		SensorRead();
 
+		//ReadSensor
+		if(currentTime > timestamp)
+			{
+			QEIEncoderPos_Update();
+			QEIEncoderVel_Update();
+			timestamp =currentTime + 100;//us
+			}
+		SensorRead();
+		//ReadSensor
 
 	  switch (state_ALL)
 	  			{
@@ -355,7 +375,8 @@ int main(void)
 					}
 	  				break;
 	  			case 2://JOY SET
-//	  				Trajectory();
+	  				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3,1);
+					HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2,0);
 	  				Joy_State();
 	  				if(ButtonTest[0] == 0)//HOME Button
 					{
@@ -370,10 +391,15 @@ int main(void)
 					{
 						state_ALL = 5;
 					}
+	  				if(ButtonTest[3] == 0)
+					{
+	  					Trajectory();
+					}
 	  				if(start == 1)
 	  				{
-	  					state_ALL = 3;
-	  					start = 0;
+//	  					state_ALL = 3;
+//	  					start = 0;
+						Trajectory();
 	  				}
 	  				break;
 	  			case 3://PID
@@ -439,8 +465,8 @@ int main(void)
 							HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
 							__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
 							reset();
-							state_ALL = 6;
-	//						state_ALL = 2;
+//							state_ALL = 6;
+							state_ALL = 2;
 							CountSetpoint = 0;
 							}
 							else
@@ -476,123 +502,38 @@ int main(void)
 	  				break;
 	  			case 4://TEST
 	  				Joy_State();
-	  				if(Mode == 1)
-	  				{
-						if(ButtonTest[1] == 0)
-						{
-							registerFrame[0x23].U16 = Pos*10;
-							MemPos[0] = Pos;
-						}
-						if(ButtonTest[2] == 0)
-						{
-							registerFrame[0x24].U16 = Pos*10;
-							MemPos[1] = Pos;
-						}
-						if(ButtonTest[3] == 0)
-						{
-							registerFrame[0x25].U16 = Pos*10;
-							MemPos[2] = Pos;
-						}
-						if(ButtonTest[4] == 0)
-						{
-							registerFrame[0x26].U16 = Pos*10;
-							MemPos[3] = Pos;
-						}
-						if(ButtonTest[5] == 0)
-						{
-							registerFrame[0x27].U16 = Pos*10;
-							MemPos[4] = Pos;
-						}
-						if(ButtonTest[0] == 0)//HOME Button
-						{
-							registerFrame[0x10].U16 = 0b0000;
-							Mode = 0;
-							state_ALL = 0;
-						}
-	  				}
-	  				else
-	  				{
-	  					if(ButtonTest[1] == 0)
-						{
-							MemPos[0] = Pos;
-						}
-						if(ButtonTest[2] == 0)
-						{
-							MemPos[1] = Pos;
-						}
-						if(ButtonTest[3] == 0)
-						{
-							MemPos[2] = Pos;
-						}
-						if(ButtonTest[4] == 0)
-						{
-							MemPos[3] = Pos;
-						}
-						if(ButtonTest[5] == 0)
-						{
-							MemPos[4] = Pos;
-						}
-						if(ButtonTest[0] == 0)//HOME Button
-						{
-							state_ALL = 0;
-							Mode = 0;
-						}
-	  				}
+	  				ButtonMem();
 					break;
 	  			case 5://JOG MODE
 	  				if(Mode == 1)
 	  				{
-	  					switch(state_Pick_Place){
-	  						case 0:
-	  							registerFrame[0x10].U16 == 0b0100;
-	  							Pos_Target = MemPos[Pick_Order[Pick]-1];
-	  							Pick++;
-	  							state_ALL = 3;
+						switch(state_Pick_Place){
+							case 0:
+								registerFrame[0x10].U16 == 0b0100;
+								Pos_Target = MemPos[Pick_Order[Pick]-1];
+								Pick++;
+								state_ALL = 3;
 								state_ALL_Old = 7;
-	  							state_Pick_Place = 1;
-	  							Velocontrol.Error[NEW] = 0;
-								Velocontrol.Error[OLD] = 0;
-								Velocontrol.Error[OLDER] = 0;
-								Velocontrol.Output[NEW] = 0;
-								Velocontrol.Output[OLD] = 0;
-								Velocontrol.Output[OLDER] = 0;
+								state_Pick_Place = 1;
 
-								Poscontrol.Error[NEW] = 0;
-								Poscontrol.Error[OLD] = 0;
-								Poscontrol.Error[OLDER] = 0;
-								Poscontrol.Output[NEW] = 0;
-								Poscontrol.Output[OLD] = 0;
-								Poscontrol.Output[OLDER] = 0;
-	  							break;
-	  						case 1:
-	  							registerFrame[0x10].U16 == 0b1000;
-	  							Pos_Target = MemPos[Place_Order[Place]-1];
-	  							Place++;
-	  							state_ALL = 3;
+								PIDreset();
+								break;
+							case 1:
+								registerFrame[0x10].U16 == 0b1000;
+								Pos_Target = MemPos[Place_Order[Place]-1];
+								Place++;
+								state_ALL = 3;
 								state_ALL_Old = 8;
-	  							state_Pick_Place = 0;
-	  							if(Place == 5)
-	  							{
-	  								state_ALL = 0;
-	  								Mode = 0;
-	  								registerFrame[0x10].U16 = 0b0000;
-	  							}
-	  							Velocontrol.Error[NEW] = 0;
-								Velocontrol.Error[OLD] = 0;
-								Velocontrol.Error[OLDER] = 0;
-								Velocontrol.Output[NEW] = 0;
-								Velocontrol.Output[OLD] = 0;
-								Velocontrol.Output[OLDER] = 0;
+								state_Pick_Place = 0;
+								if(Place == 5)
+								{
+									state_ALL = 0;
+									Mode = 0;
+									registerFrame[0x10].U16 = 0b0000;
+								}
 
-								Poscontrol.Error[NEW] = 0;
-								Poscontrol.Error[OLD] = 0;
-								Poscontrol.Error[OLDER] = 0;
-								Poscontrol.Output[NEW] = 0;
-								Poscontrol.Output[OLD] = 0;
-								Poscontrol.Output[OLDER] = 0;
-	  							break;
-
-
+								PIDreset();
+								break;
 	  					}
 	  				}
 	  				else
@@ -607,20 +548,8 @@ int main(void)
 						i = 0;
 						}
 
-						Velocontrol.Error[NEW] = 0;
-						Velocontrol.Error[OLD] = 0;
-						Velocontrol.Error[OLDER] = 0;
-						Velocontrol.Output[NEW] = 0;
-						Velocontrol.Output[OLD] = 0;
-						Velocontrol.Output[OLDER] = 0;
-
-						Poscontrol.Error[NEW] = 0;
-						Poscontrol.Error[OLD] = 0;
-						Poscontrol.Error[OLDER] = 0;
-						Poscontrol.Output[NEW] = 0;
-						Poscontrol.Output[OLD] = 0;
-						Poscontrol.Output[OLDER] = 0;
-	  				}\
+						PIDreset();
+	  				}
 					break;
 	  			case 6://Gripper
 	  				switch (state_Griper)
@@ -629,11 +558,15 @@ int main(void)
 								if(LeadSW[1] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1))
 								{
 									//PUSH
+									HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5,1);
+									HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,0);
 								}
 								else if(LeadSW[0] == 0)
 								{
 									if(CountGriper > 100)
 									{
+										HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5,0);
+										HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,0);
 										state_Griper = 1;
 										CountGriper = 0;
 									}
@@ -651,26 +584,36 @@ int main(void)
 								}
 	  						break;
 	  					case 1:
+	  							static uint32_t timeVacuum = 0;
+								if(timeVacuum < HAL_GetTick())
+								{
+									CountVacuum++;
+									timeVacuum = HAL_GetTick()+10;
+								}
 								if(CountVacuum < 500)
 								{
 									//ON-OFF Vacuum
 									if(state_ALL_Old == 7)
 									{
+										HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6,1);
 										//ON_Vacuum
 									}
 									if(state_ALL_Old == 8)
 									{
+										HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6,0);
 										//OFF_Vacuum
 									}
 									else
 									{
 										if(VacuumNF == 1)
 										{
+											HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6,1);
 											//ON_Vacuum
 											VacuumNF = 0;
 										}
 										else
 										{
+											HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6,0);
 											//OFF_Vacuum
 											VacuumNF = 1;
 										}
@@ -682,25 +625,24 @@ int main(void)
 									state_Griper = 2;
 									CountVacuum = 0;
 								}
-								static uint32_t timeVacuum = 0;
-								if(timeVacuum < HAL_GetTick())
-								{
-									CountVacuum++;
-									timeVacuum = HAL_GetTick()+10;
-								}
+
 								break;
 	  					case 2:
 	  							if(LeadSW[0] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1))
 								{
 	  								//PULL
+	  								HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5,0);
+	  								HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,1);
 								}
 	  							else if(LeadSW[1] == 0)
 								{
 	  								if(CountGriper > 100)
 									{
+	  									HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5,0);
+	  									HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,0);
 	  									state_Griper = 0;
 										CountGriper = 0;
-										if(state_ALL_Old == 5)
+										if(state_ALL_Old == 5 || state_ALL_Old == 7 || state_ALL_Old == 8)
 										{
 											state_ALL = 5;
 										}
@@ -730,6 +672,9 @@ int main(void)
 
 
 	  				break;
+	  				case 7://FREEZE
+
+	  					break;
 	  			}
   }
   /* USER CODE END 3 */
@@ -1313,11 +1258,13 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, LAMP1_Pin|LAMP2_Pin|PULL_Pin|PUSH_Pin
-                          |Vacuum_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, LAMP1_Pin|LAMP2_Pin|PUSH_Pin|Vacuum_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, DirectionMotor_Pin|AnotherDMotor_Pin|LD2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(PULL_GPIO_Port, PULL_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -1347,11 +1294,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : Emergency_Read_Pin */
-  GPIO_InitStruct.Pin = Emergency_Read_Pin;
+  /*Configure GPIO pin : ResetSw_Pin */
+  GPIO_InitStruct.Pin = ResetSw_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(Emergency_Read_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(ResetSw_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LeadSW2_Pin Floor1_Pin Floor5_Pin */
   GPIO_InitStruct.Pin = LeadSW2_Pin|Floor1_Pin|Floor5_Pin;
@@ -1359,11 +1306,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : ResetSW_Pin */
-  GPIO_InitStruct.Pin = ResetSW_Pin;
+  /*Configure GPIO pin : EmergencySw_Pin */
+  GPIO_InitStruct.Pin = EmergencySw_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(ResetSW_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(EmergencySw_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : Floor2_Pin Floor3_Pin HomeButton_Pin */
   GPIO_InitStruct.Pin = Floor2_Pin|Floor3_Pin|HomeButton_Pin;
@@ -1392,80 +1339,23 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+void Joy_Averaged()
 {
-if(htim == &htim5)
-{
-_micros += UINT32_MAX;
-}
-if(htim == &htim6)
-{
-	Heartbeat();
-	Routine();
-}
-}
-
-uint64_t micros()
-{
-return __HAL_TIM_GET_COUNTER(&htim5)+_micros;
-}
-
-void QEIEncoderPos_Update()
-{
-	QEIReadRaw = __HAL_TIM_GET_COUNTER(&htim3);
-	if(Count >= 0)
+	for (int i = 0; i < 20; i++)
 	{
-		Pos = ((QEIReadRaw+(Count*57344))*25*3.14)/8192;
+		joySum[0] += joyAnalogRead[2*i];
+		joySum[1] += joyAnalogRead[1+(2*i)];
 	}
-	else
+
+	for (int i = 0; i < 2; i++)
 	{
-		Pos	= ((QEIReadRaw-(fabs(Count)*57344))*25*3.14)/8192;
+		joyAvg[i] = joySum[i] / 20;
+		joySum[i] = 0;
 	}
+
+	joyX = joyAvg[0];
+	joyY = joyAvg[1];
 }
-void QEIEncoderVel_Update()
-{
-//collect data
-QEIdata.TimeStamp[NEW] = micros();
-QEIdata.Position[NEW] = __HAL_TIM_GET_COUNTER(&htim3);
-//Postion 1 turn calculation
-QEIdata.QEIPostion_1turn = QEIdata.Position[NEW] % 8192;
-//calculate dx
-int32_t diffPosition = QEIdata.Position[NEW] - QEIdata.Position[OLD];
-//Handle Warp around
-if(diffPosition > 28672)
-{
-diffPosition -=57344;
-Count-=1;
-}
-if(diffPosition < -28672)
-{
-diffPosition +=57344;
-Count+=1;
-}
-
-//calculate dt
-float diffTime = (QEIdata.TimeStamp[NEW]-QEIdata.TimeStamp[OLD]) * 0.000001;
-//calculate anglar velocity
-QEIdata.QEIAngularVelocity = diffPosition / diffTime;
-RPSspeed = ((QEIdata.QEIAngularVelocity)/8192)*60;
-speed = ((QEIdata.QEIAngularVelocity)/8192)*12.5*2*3.14;
-
-
-speed_fill = (0.969*speed_fill_1)+(0.0155*speed)+(0.0155*speed_1);
-speed_1 = speed;
-speed_fill_1 = speed_fill;
-
-
-
-if(speed_fill>MAXspeed)
-{
-	MAXspeed = speed_fill;
-}
-//store value for next loop
-QEIdata.Position[OLD] = QEIdata.Position[NEW];
-QEIdata.TimeStamp[OLD]=QEIdata.TimeStamp[NEW];
-}
-
 void Joy_State()
 {
 joySW = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
@@ -1476,6 +1366,21 @@ if(state == 0)
 	if (joyY > 4000)
 	{
 		__HAL_TIM_SET_COUNTER(&htim3, 0);
+	}
+	static uint64_t timestamp4 =0;
+	if(timestamp4 < HAL_GetTick())
+	{
+		if(joyX > 4000)
+		{
+			X_Actual_Position = X_Actual_Position-10;
+		}
+		if(joyX < 2000)
+		{
+			X_Actual_Position = X_Actual_Position+10;
+		}
+		if(X_Actual_Position <= 0)X_Actual_Position=0;
+		timestamp4 = HAL_GetTick()+100;
+		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 	}
 }
 
@@ -1519,7 +1424,7 @@ else if(state == 1)
 else if(state == 2)
 {
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5,1);
-	if(joyY > 3200 || joyY < 2700)
+	if(joyY > 3200 || joyY < 2000)
 	{
 		if (joyY > 3200)
 		{
@@ -1587,8 +1492,72 @@ else if(state == 2)
 	}
 	Joy_Averaged();
 }
-void reset()
-{
+void ButtonMem(){
+	if(Mode == 1)
+		{
+			if(ButtonTest[1] == 0)
+			{
+				registerFrame[0x23].U16 = Pos*10;
+				MemPos[0] = Pos;
+			}
+			if(ButtonTest[2] == 0)
+			{
+				registerFrame[0x24].U16 = Pos*10;
+				MemPos[1] = Pos;
+			}
+			if(ButtonTest[3] == 0)
+			{
+				registerFrame[0x25].U16 = Pos*10;
+				MemPos[2] = Pos;
+			}
+			if(ButtonTest[4] == 0)
+			{
+				registerFrame[0x26].U16 = Pos*10;
+				MemPos[3] = Pos;
+			}
+			if(ButtonTest[5] == 0)
+			{
+				registerFrame[0x27].U16 = Pos*10;
+				MemPos[4] = Pos;
+			}
+			if(ButtonTest[0] == 0)//HOME Button
+			{
+				registerFrame[0x10].U16 = 0b0000;
+				Mode = 0;
+				state_ALL = 0;
+			}
+		}
+		else
+		{
+			if(ButtonTest[1] == 0)
+			{
+				MemPos[0] = Pos;
+			}
+			if(ButtonTest[2] == 0)
+			{
+				MemPos[1] = Pos;
+			}
+			if(ButtonTest[3] == 0)
+			{
+				MemPos[2] = Pos;
+			}
+			if(ButtonTest[4] == 0)
+			{
+				MemPos[3] = Pos;
+			}
+			if(ButtonTest[5] == 0)
+			{
+				MemPos[4] = Pos;
+			}
+			if(ButtonTest[0] == 0)//HOME Button
+			{
+				state_ALL = 0;
+				Mode = 0;
+			}
+		}
+}
+
+void reset(){
 	Velocontrol.Error[NEW] = 0;
 	Velocontrol.Error[OLD] = 0;
 	Velocontrol.Error[OLDER] = 0;
@@ -1606,23 +1575,83 @@ void reset()
 	Velo_Start = 0;
 	t = 0;
 }
-void Joy_Averaged()
-{
-	for (int i = 0; i < 20; i++)
-	{
-		joySum[0] += joyAnalogRead[2*i];
-		joySum[1] += joyAnalogRead[1+(2*i)];
-	}
+void PIDreset(){
+	Velocontrol.Error[NEW] = 0;
+	Velocontrol.Error[OLD] = 0;
+	Velocontrol.Error[OLDER] = 0;
+	Velocontrol.Output[NEW] = 0;
+	Velocontrol.Output[OLD] = 0;
+	Velocontrol.Output[OLDER] = 0;
 
-	for (int i = 0; i < 2; i++)
-	{
-		joyAvg[i] = joySum[i] / 20;
-		joySum[i] = 0;
-	}
-
-	joyX = joyAvg[0];
-	joyY = joyAvg[1];
+	Poscontrol.Error[NEW] = 0;
+	Poscontrol.Error[OLD] = 0;
+	Poscontrol.Error[OLDER] = 0;
+	Poscontrol.Output[NEW] = 0;
+	Poscontrol.Output[OLD] = 0;
+	Poscontrol.Output[OLDER] = 0;
 }
+void QEIEncoderPos_Update()
+{
+	QEIReadRaw = __HAL_TIM_GET_COUNTER(&htim3);
+	if(Count >= 0)
+	{
+		Pos = ((QEIReadRaw+(Count*57344))*25*3.14)/8192;
+	}
+	else
+	{
+		Pos	= ((QEIReadRaw-(fabs(Count)*57344))*25*3.14)/8192;
+	}
+}
+void QEIEncoderVel_Update()
+{
+//collect data
+QEIdata.TimeStamp[NEW] = micros();
+QEIdata.Position[NEW] = __HAL_TIM_GET_COUNTER(&htim3);
+//Postion 1 turn calculation
+QEIdata.QEIPostion_1turn = QEIdata.Position[NEW] % 8192;
+//calculate dx
+int32_t diffPosition = QEIdata.Position[NEW] - QEIdata.Position[OLD];
+//Handle Warp around
+if(diffPosition > 28672)
+{
+diffPosition -=57344;
+Count-=1;
+}
+if(diffPosition < -28672)
+{
+diffPosition +=57344;
+Count+=1;
+}
+
+//calculate dt
+float diffTime = (QEIdata.TimeStamp[NEW]-QEIdata.TimeStamp[OLD]) * 0.000001;
+//calculate anglar velocity
+QEIdata.QEIAngularVelocity = diffPosition / diffTime;
+speed = ((QEIdata.QEIAngularVelocity)/8192)*12.5*2*3.14;
+
+speed_fill = (0.969*speed_fill_1)+(0.0155*speed)+(0.0155*speed_1);
+speed_1 = speed;
+speed_fill_1 = speed_fill;
+static uint64_t timestamp_Accelation =0;
+if(timestamp_Accelation < HAL_GetTick())
+{
+Accelation = fabs(speed_fill-speed_fill_1)/0.01;
+timestamp_Accelation = HAL_GetTick()+10;
+}
+
+
+
+
+
+if(speed_fill>MAXspeed)
+{
+	MAXspeed = speed_fill;
+}
+//store value for next loop
+QEIdata.Position[OLD] = QEIdata.Position[NEW];
+QEIdata.TimeStamp[OLD]=QEIdata.TimeStamp[NEW];
+}
+
 void Trajectory()
 {
 	static uint64_t timestamp_Traject =0;
@@ -1681,42 +1710,29 @@ void Trajectory()
 			  	  				}
 			  	  			  	break;
 			  	  		  case 3:
+			  	  			  	if (FirstTraject == 1)
+			  	  			  	{
+			  	  			  	Old_Target = Pos_Target;
+			  	  			  	FirstTraject = 0;
+			  	  			  	}
 			  	  			  	if(Pos_Target != Old_Target)
 			  	  			  	{
-
-
 			  	  			  		state_Tra = 0;
 			  	  			  		t = 0;
 			  	  			  		Pos_Start = Pos;
+//			  	  			  		Pos_Start = q_Pos;
 			  	  			  		Velo_Start = q_Velo;
 			  	  			  		Old_Target = Pos_Target;
-			  	  			  		Velocontrol.Error[NEW] = 0;
-									Velocontrol.Error[OLD] = 0;
-									Velocontrol.Error[OLDER] = 0;
-									Velocontrol.Output[NEW] = 0;
-									Velocontrol.Output[OLD] = 0;
-									Velocontrol.Output[OLDER] = 0;
-
-									Poscontrol.Error[NEW] = 0;
-									Poscontrol.Error[OLD] = 0;
-									Poscontrol.Error[OLDER] = 0;
-									Poscontrol.Output[NEW] = 0;
-									Poscontrol.Output[OLD] = 0;
-									Poscontrol.Output[OLDER] = 0;
+			  	  			  		PIDreset();
 
 			  	  			  	}
 			  	  			  	break;
 			  	  		  }
-//			  error_Velo = q_Velo-speed;
-//			  output = ((2*kp_Velo*T*error_Velo) - (2*kp_Velo*T*error_Velo_2) +(ki_Velo*T*T*error_Velo)+(2*ki_Velo*T*T*error_Velo_1)+(ki_Velo*T*T*error_Velo_2)+(4*kd_Velo*error_Velo)-(8*kd_Velo*error_Velo_1)-(4*kd_Velo*error_Velo_2)+(2*output_2*T))/(2*T);
-//			  error_Velo_2 = error_Velo_1;
-//			  error_Velo_1 = error_Velo;
-//			  output_2 = output_1;
-//			  output_1 = output;
 		  t = t+0.0001;
 		  timestamp_Traject = currentTime + 100;
 		  }
 }
+
 void PIDposition()
 {
 	static uint64_t timestamp3 =0;
@@ -1753,24 +1769,21 @@ void PIDposition()
 	  }
 }
 
-
-
-
-
 void State_To_Mode(){
-	static uint32_t timestamp = 0;
-	if (timestamp < HAL_GetTick()) {
-        timestamp = HAL_GetTick() + 200;
         if(registerFrame[0x01].U16 == 0b0001){
         	registerFrame[0x01].U16 = 0b0000;
 			registerFrame[0x10].U16 = 0b0001;
         	Mode = 1;
         	state_ALL = 4;
+        	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3,0);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2,1);
         }
         if(registerFrame[0x01].U16 == 0b0010){
 //            Mode = 2;
         	Mode = 1;
             state_ALL = 0;
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3,0);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2,1);
         }
         if(registerFrame[0x01].U16 == 0b0100){
 //            Mode = 3;
@@ -1779,6 +1792,8 @@ void State_To_Mode(){
 			splitInteger(registerFrame[0x21].U16, Pick_Order);
 			splitInteger(registerFrame[0x22].U16, Place_Order);
 			state_ALL = 5;
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3,0);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2,1);
         }
         if(registerFrame[0x01].U16 == 0b1000){
 //          Point Mode
@@ -1789,8 +1804,9 @@ void State_To_Mode(){
 			Pos_Target = Goal_Point;
 			state_ALL = 3;
 			state_ALL_Old = 2;
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3,0);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2,1);
         }
-	}
 }
 
 void Heartbeat(){
@@ -1809,72 +1825,63 @@ void UpdatePosRoutine()
 {
 	registerFrame[0x11].U16 = fabs(Pos)*10;
 	registerFrame[0x12].U16 = fabs(speed_fill)*10;
-	registerFrame[0x13].U16 = Z_Acceleration*10;
+	registerFrame[0x13].U16 = Accelation*10;
 	registerFrame[0x40].U16 = X_Actual_Position*10;
 }
-
 void Vacuum() {
-    static uint32_t timestamp = 0;
-    if (timestamp < HAL_GetTick()){
-        timestamp = HAL_GetTick() + 200;
         Vacuum_Status = registerFrame[0x02].U16;
-    }
+        if(Vacuum_Status == 1)
+        {
+        	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6,1);
+        }
+        else
+        {
+        	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6,0);
+        }
 }
-
 //Write Gripper Movement Status
 void GripperMovement() {
-    static uint32_t timestamp = 0;
-    if (timestamp < HAL_GetTick()){
-        timestamp = HAL_GetTick() + 200;
         Gripper_Movement_Status = registerFrame[0x03].U16;
-    }
-}
+        if( Gripper_Movement_Status == 1)
+	   {
+        	if(LeadSW[1] == 0)
+			{
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5,0);
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,0);
+			}
+			else
+			{
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5,1);
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,0);
+			}
 
-void SetShelves() {
-        if (Mode == 1){
-        	registerFrame[0x01].U16 = 0b0000;
-        	Mode=0;
-        	registerFrame[0x10].U16 = 0b0001;
-
-        	registerFrame[0x23].U16 = Shelve_Position[0];
-        	registerFrame[0x24].U16 = Shelve_Position[1];
-        	registerFrame[0x25].U16 = Shelve_Position[2];
-        	registerFrame[0x26].U16 = Shelve_Position[3];
-        	registerFrame[0x27].U16 = Shelve_Position[4];
-
-//        	HAL_Delay(300);//Test Reset
-
-			registerFrame[0x10].U16 = 0b0000;
-			Mode = 0;
+	   }
+        else if(Gripper_Movement_Status == 0)
+        {
+        	if(LeadSW[0] == 0)
+        	{
+        		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5,0);
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,0);
+        	}
+        	else
+        	{
+        		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5,0);
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,1);
+        	}
         }
-    }
-
-void Run_Point_Mode() {
-
-        if (Mode==4){
-        	registerFrame[0x01].U16 = 0b0000;
-        	Mode=0;
-        	registerFrame[0x10].U16 = 0b10000;
-        	Goal_Point = registerFrame[0x30].U16/10;
-        	Pos_Target = Goal_Point;
-        	Mode = 1;
-		}
-
-        	//ใส่คำสั่งให้หุ่นเคลื่อนที่ไป Goal_Point
-
-        	//ถึงGoal_Point�?ล้ว
-//        	HAL_Delay(300);//Test Reset
-        	registerFrame[0x10].U16 = 0b0000;
-        	Mode = 0;
-    }
-
+	   else
+	   {
+		   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5,0);
+		   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,0);
+	   }
+}
 void SetHome() {
 	if(Mode == 1)
 		{
 			registerFrame[0x01].U16 = 0b0000;
 			registerFrame[0x10].U16 = 0b0010;
-			test = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5);
-			if(HOME == 1||HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1)
+			test = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_4);
+			if(HOME == 1||HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_4) == 1)
 			{
 				if(CountHome > 100)
 				{
@@ -1891,6 +1898,9 @@ void SetHome() {
 					state_Tra = 0;
 					CountHome = 0;
 					registerFrame[0x10].U16 = 0b0000;//Reset ModBus
+					HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3,1);
+					HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2,0);
+					reset();
 				}
 				else
 				{
@@ -1906,8 +1916,8 @@ void SetHome() {
 		}
 		else
 		{
-			test = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5);
-			if(HOME == 1||HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1)
+			test = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_4);
+			if(HOME == 1||HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_4) == 1)
 			{
 				if(CountHome > 100)
 				{
@@ -1923,6 +1933,9 @@ void SetHome() {
 					state_ALL = 2;
 					state_Tra = 0;
 					CountHome = 0;
+					HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3,1);
+					HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2,0);
+					reset();
 				}
 				else
 				{
@@ -1938,36 +1951,6 @@ void SetHome() {
 		}
     }
 
-void Run_Jog_Mode() {
-    static uint32_t timestamp = 0;
-    if (timestamp < HAL_GetTick()){
-        timestamp = HAL_GetTick() + 200;
-        if (Mode == 3){
-        	registerFrame[0x01].U16 = 0b0000;
-//
-//        	Pick_Order = registerFrame[0x21].U16;
-//        	Place_Order = registerFrame[0x22].U16;
-//        	int i;
-//        	for (i = 0; i < 5; i++) {
-//
-//        		//ใส่คำสั่งPickไปที่ Pick_Order[i]
-//
-//        		registerFrame[0x10].U16 == 0b0100;
-//
-//        		//ใส่คำสั่งPlaceไปที่ Place_Order[i]
-//
-//        		registerFrame[0x10].U16 == 0b1000;
-//
-//
-//
-//        	}
-        	//ถ้าjoggingเสร็จ�?ล้วset Moving Status = 0
-        	registerFrame[0x10].U16 = 0b0000;
-        	Mode = 0;
-		}
-    }
-}
-
 void splitInteger(int number, int *digitsArray) {
     int temp = number;
     for (int b = 0; b < 5; b++) {
@@ -1975,22 +1958,6 @@ void splitInteger(int number, int *digitsArray) {
         temp /= 10;  // Removing the last digit
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 void SensorRead()
 {
 	ButtonTest[0] = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10);
@@ -2003,24 +1970,62 @@ void SensorRead()
 	LeadSW[1] = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_1);
 	test = LeadSW[1] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1);
 	test2 = LeadSW[0] == 0 || (LeadSW[1] == 1 && LeadSW[0] == 1);
+	emer = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4); //emer
+	resetBut = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_2); //reset
 }
+//void Stopper(){
+//	if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_4) == 1 || HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == 1)
+//	{
+//		if(CountProxi > 100)
+//		{
+////			state_ALL_Freeze = state_ALL;
+////			state_ALL = 2;
+//			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+//			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+//		}
+//		else
+//		{
+//			CountProxi++;
+//		}
+//	}
+//	else
+//	{
+//		CountProxi = 0;
+//	}
+//}
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+if(htim == &htim5)
+{
+_micros += UINT32_MAX;
+}
+if(htim == &htim6)
+{
+	Heartbeat();
+	Routine();
+}
+}
+uint64_t micros()
+{
+return __HAL_TIM_GET_COUNTER(&htim5)+_micros;
+}
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == GPIO_PIN_13)
 	{
 		start  = 1;
 	}
-	if(GPIO_Pin == GPIO_PIN_4)
-	{
-		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-		HOME = 1;
-	}
-	if(GPIO_Pin == GPIO_PIN_5)
-	{
-		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-		HOME = 2;
-	}
+//	if(GPIO_Pin == GPIO_PIN_4)
+//	{
+//		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+//		HOME = 1;
+//	}
+//	if(GPIO_Pin == GPIO_PIN_5)
+//	{
+//		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+//		HOME = 2;
+//	}
 }
 /* USER CODE END 4 */
 

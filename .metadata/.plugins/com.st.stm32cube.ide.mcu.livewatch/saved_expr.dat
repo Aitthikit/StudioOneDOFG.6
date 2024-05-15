@@ -47,3 +47,9 @@ Place_Order
 CountVacuum
 Place
 Mode
+registerFrame[0x00].U16
+registerFrame[0x02].U16
+registerFrame[0x03].U16
+emer
+resetBut
+Mode

@@ -74,8 +74,8 @@ void Error_Handler(void);
 #define DirectionMotor_GPIO_Port GPIOA
 #define AnotherDMotor_Pin GPIO_PIN_1
 #define AnotherDMotor_GPIO_Port GPIOA
-#define Emergency_Read_Pin GPIO_PIN_4
-#define Emergency_Read_GPIO_Port GPIOA
+#define ResetSw_Pin GPIO_PIN_4
+#define ResetSw_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
 #define TIM3_Encoder_A_Pin GPIO_PIN_6
@@ -88,8 +88,8 @@ void Error_Handler(void);
 #define LeadSW2_GPIO_Port GPIOB
 #define JOY_Y_Pin GPIO_PIN_1
 #define JOY_Y_GPIO_Port GPIOB
-#define ResetSW_Pin GPIO_PIN_2
-#define ResetSW_GPIO_Port GPIOB
+#define EmergencySw_Pin GPIO_PIN_2
+#define EmergencySw_GPIO_Port GPIOB
 #define Floor1_Pin GPIO_PIN_10
 #define Floor1_GPIO_Port GPIOB
 #define JOY_X_Pin GPIO_PIN_13
