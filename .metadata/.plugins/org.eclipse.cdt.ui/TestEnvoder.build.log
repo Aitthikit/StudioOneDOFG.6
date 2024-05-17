@@ -1,10 +1,10 @@
-17:10:16 **** Build of configuration Debug for project TestEnvoder ****
+14:56:24 **** Build of configuration Debug for project TestEnvoder ****
 make -j12 all 
 arm-none-eabi-size  TestEnvoder.elf 
    text	   data	    bss	    dec	    hex	filename
-  14300	     12	   1808	  16120	   3ef8	TestEnvoder.elf
+  22056	     12	   2088	  24156	   5e5c	TestEnvoder.elf
 Finished building: default.size.stdout
  
 
-17:10:16 Build Finished. 0 errors, 0 warnings. (took 386ms)
+14:56:24 Build Finished. 0 errors, 0 warnings. (took 552ms)
 
