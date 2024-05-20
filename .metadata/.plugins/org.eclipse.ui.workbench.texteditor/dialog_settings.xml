@@ -1,27 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
-		<item key="selection" value="VacuumNF"/>
+		<item key="selection" value="HAL_Delay"/>
 		<item key="wrap" value="true"/>
 		<item key="casesensitive" value="false"/>
 		<item key="wholeword" value="false"/>
 		<item key="incremental" value="false"/>
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
+			<item value="HAL_Delay"/>
+			<item value="home"/>
+			<item value="Velocontrol"/>
+			<item value="Pos"/>
+			<item value="test"/>
+			<item value="Velocontrol.Output[NEW]"/>
+			<item value="ButtonTest[0]"/>
+			<item value="registerFrame[0x10].U16"/>
+			<item value="Z_Moveing_Status"/>
+			<item value="Poscontrol"/>
 			<item value="VacuumNF"/>
 			<item value="reset"/>
 			<item value="Pos_Start"/>
-			<item value="Pos"/>
 			<item value="550"/>
 			<item value="GPIO_PIN_8"/>
-			<item value="state_ALL = 0"/>
-			<item value="speed_fill"/>
-			<item value="HAL_Delay"/>
-			<item value="test"/>
-			<item value="Pos_Target"/>
-			<item value="Velo"/>
 		</list>
 		<list key="replacehistory">
+			<item value="Poscontrol"/>
+			<item value="Z_Moveing_Status"/>
+			<item value="Velocontrol2"/>
+			<item value="Poscontrol2"/>
 			<item value="Pos"/>
 			<item value="Velo"/>
 		</list>

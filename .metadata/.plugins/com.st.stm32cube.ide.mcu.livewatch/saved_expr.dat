@@ -27,6 +27,15 @@ LeadSW
 state_Griper
 Pick_Order
 Place_Order
-CountVacuum
 Mode
 state_Pick_Place
+registerFrame[0x04].U16
+Place
+Pick
+q_Acc
+ONE
+TWO
+THREE
+FOUR
+test
+VacuumNF
