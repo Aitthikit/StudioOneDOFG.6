@@ -80,6 +80,7 @@ int Place_Order[5];
 //ModBus
 
 //TEST
+float PWMmap;
 float ONE;
 float TWO;
 float THREE;
@@ -229,6 +230,7 @@ void PIDposition2();
 void SensorRead();
 void ButtonMem();
 void Stopper();
+float mapFloat(float x, float in_min, float in_max, float out_min, float out_max);
 //ModBus
 void State_To_Mode();
 void Heartbeat();
@@ -301,14 +303,14 @@ int main(void)
   HAL_ADC_Start_DMA(&hadc3, joyAnalogRead, 40);
   _micros = 0;
 
-	Velocontrol.kp = 157;//225;//180
-	Velocontrol.ki = 0.1;//2;//25
+	Velocontrol.kp = 0.12;//157;//225;//180
+	Velocontrol.ki = 0.0001;//74;//2;//25
 	Velocontrol.kd = 0;
 	Velocontrol.T = 0.0001;
 
-	Poscontrol.kp = 2.1;//1;//0.5667;//2.015,0.6
-	Poscontrol.ki = 0.46;//0.4;//1.29;//4.5425,1.34
-	Poscontrol.kd = 0.00005;//0.0000007;//0.000001;//0.0000021,0.0000004
+	Poscontrol.kp = 50;//0.123;//2.1;//1;//0.5667;//2.015,0.6
+	Poscontrol.ki = 0.06;//1;//0.46;//0.4;//1.29;//4.5425,1.34
+	Poscontrol.kd = 0;//0.00005;//0.0000007;//0.000001;//0.0000021,0.0000004
 	Poscontrol.T = 0.0001;
 
 	Velocontrol2.kp = 50;//225;//180
@@ -464,7 +466,7 @@ int main(void)
 							Mode = 0;
 							reset();
 						}
-						if(fabs(Pos-Pos_Target) <= 0.8)//Limit
+						if(fabs(Pos-Pos_Target) <= 1)//Limit
 						{
 							if(currentTime > timestamp5)
 						  {
@@ -511,7 +513,7 @@ int main(void)
 							Mode = 0;
 							reset();
 						}
-						if(fabs(Pos-Pos_Target) <= 0.8)//Limit
+						if(fabs(Pos-Pos_Target) <= 1)//Limit
 						{
 							if(currentTime > timestamp5)
 						  {
@@ -555,7 +557,7 @@ int main(void)
 								break;
 							case 1:
 								registerFrame[0x10].U16 = 0b1000;
-								Pos_Target = MemPos[Place_Order[Place]-1]+5;
+								Pos_Target = MemPos[Place_Order[Place]-1]+10;
 								Place++;
 								state_ALL = 3;
 								state_ALL_Old = 8;
@@ -595,7 +597,7 @@ int main(void)
 								}
 								else if(LeadSW[1] == 0)
 								{
-									if(CountGriper > 100)
+									if(CountGriper > 15)
 									{
 										HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5,0);
 										HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,0);
@@ -685,7 +687,7 @@ int main(void)
 								}
 	  							else if(LeadSW[0] == 0)
 								{
-	  								if(CountGriper > 100)
+	  								if(CountGriper > 15)
 									{
 	  									HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5,0);
 	  									HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,0);
@@ -1657,7 +1659,7 @@ void reset(){
 	Poscontrol.Output[NEW] = 0;
 	Poscontrol.Output[OLD] = 0;
 	Poscontrol.Output[OLDER] = 0;
-
+	PWMmap = 0;
 	Pos_Start = Pos;
 	Velo_Start = 0;
 	t = 0;
@@ -1880,8 +1882,8 @@ void PIDposition()
 			FOUR = (Velocontrol.Output[OLD]*2*Velocontrol.T)/(2*Velocontrol.T);
 			Velocontrol.Output[NEW] = (ONE-TWO+THREE+FOUR);//
 //			test = (ONE-TWO+THREE+FOUR);
-			if(Velocontrol.Output[NEW]>42500)Velocontrol.Output[NEW]=42500;
-			if(Velocontrol.Output[NEW]<-42500)Velocontrol.Output[NEW]=-42500;
+			if(Velocontrol.Output[NEW]>24)Velocontrol.Output[NEW]=24;
+			if(Velocontrol.Output[NEW]<-24)Velocontrol.Output[NEW]=-24;
 			Velocontrol.Error[OLDER] = Velocontrol.Error[OLD];
 			Velocontrol.Error[OLD] = Velocontrol.Error[NEW];
 			Velocontrol.Output[OLD] = Velocontrol.Output[NEW];
@@ -1897,15 +1899,33 @@ void PIDposition()
 	//					if(fabs(Pos_Target-Pos) <= 0.1)start = 0;
 			timestamp3 =currentTime + 100;
 	  }
-	  if(Velocontrol.Output[NEW] > 0)
+		PWMmap = mapFloat(Velocontrol.Output[NEW],-24.0,24.0,-42500,42500);
+	  if(PWMmap > 0)
 	  {
 		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, Velocontrol.Output[NEW]);
+//		  if(Velocontrol.Output[NEW] < 5000)
+//		  {
+//			  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 6000);
+//		  }
+//		  else
+//		  {
+//		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, Velocontrol.Output[NEW]);
+//		  }
+		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, PWMmap);
 	  }
 	  else
 	  {
 		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
+//		  if(fabs(Velocontrol.Output[NEW]) < 5000)
+//		  {
+//			  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 6000);
+//		  }
+//		  else
+//		  {
+//			  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(Velocontrol.Output[NEW]));
+//		  }
+		  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, fabs(PWMmap));
+
 	  }
 }
 void PIDposition2()
@@ -2071,7 +2091,7 @@ void SetHome() {
 				if(CountHome > 100)
 				{
 					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-					__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 2000);
+					__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
 					static uint64_t DelayTime = 0;
 					if(DelayTime < HAL_GetTick())
 					{
@@ -2090,6 +2110,9 @@ void SetHome() {
 						state_ALL = 2;
 						state_Tra = 0;
 						CountHome = 0;
+						Place = 0;
+						Pick = 0;
+						state_Pick_Place = 0;
 						registerFrame[0x10].U16 = 0b0000;//Reset ModBus
 						HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3,1);
 						HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2,0);
@@ -2106,7 +2129,7 @@ void SetHome() {
 			else
 			{
 			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 6000);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 8000);
 			CountHome = 0;
 			}
 		}
@@ -2117,7 +2140,7 @@ void SetHome() {
 				if(CountHome > 100)
 				{
 					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-					__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 2000);
+					__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
 					//HAL_Delay(1000);
 					static uint64_t DelayTime = 0;
 					if(DelayTime < HAL_GetTick())
@@ -2137,6 +2160,9 @@ void SetHome() {
 					state_ALL = 2;
 					state_Tra = 0;
 					CountHome = 0;
+					Place = 0;
+					Pick = 0;
+					state_Pick_Place = 0;
 					HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3,1);
 					HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2,0);
 					resetHome();
@@ -2151,7 +2177,7 @@ void SetHome() {
 			else
 			{
 			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 6000);
+			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 8000);
 			CountHome = 0;
 			}
 		}
@@ -2197,6 +2223,9 @@ void SensorRead()
 //		CountProxi = 0;
 //	}
 //}
+float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
