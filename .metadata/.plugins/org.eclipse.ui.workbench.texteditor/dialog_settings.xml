@@ -1,42 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
-		<item key="selection" value="2000"/>
+		<item key="selection" value="0"/>
 		<item key="wrap" value="true"/>
 		<item key="casesensitive" value="false"/>
 		<item key="wholeword" value="false"/>
 		<item key="incremental" value="false"/>
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
-			<item value="2000"/>
-			<item value="HAL_Delay"/>
-			<item value="home"/>
+			<item value="0"/>
+			<item value="0.23"/>
+			<item value="0.2"/>
+			<item value="0.3"/>
 			<item value="Velocontrol"/>
 			<item value="Pos"/>
-			<item value="test"/>
-			<item value="Velocontrol.Output[NEW]"/>
-			<item value="ButtonTest[0]"/>
-			<item value="registerFrame[0x10].U16"/>
-			<item value="Z_Moveing_Status"/>
-			<item value="Poscontrol"/>
-			<item value="VacuumNF"/>
-			<item value="reset"/>
-			<item value="Pos_Start"/>
-			<item value="550"/>
+			<item value="mapFloat"/>
+			<item value="GPIO_Pin"/>
+			<item value="Kal"/>
+			<item value="2001"/>
+			<item value="2222"/>
+			<item value="kalman"/>
+			<item value="C"/>
+			<item value="B"/>
+			<item value="A"/>
 		</list>
 		<list key="replacehistory">
-			<item value="0"/>
-			<item value="Poscontrol"/>
-			<item value="Z_Moveing_Status"/>
+			<item value="1"/>
+			<item value="baseSpeed"/>
+			<item value="0.23"/>
+			<item value="0.2"/>
+			<item value="Velocontrol4"/>
+			<item value="Velocontrol3"/>
 			<item value="Velocontrol2"/>
-			<item value="Poscontrol2"/>
-			<item value="Pos"/>
 			<item value="Velo"/>
+			<item value="GPIO_PIN"/>
+			<item value="1111"/>
+			<item value="1000"/>
+			<item value="Ck"/>
+			<item value="Ak"/>
+			<item value="2222"/>
+			<item value="1250"/>
 		</list>
 	</section>
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
-		<item key="DIALOG_X_ORIGIN" value="90"/>
-		<item key="DIALOG_Y_ORIGIN" value="283"/>
+		<item key="DIALOG_X_ORIGIN" value="1190"/>
+		<item key="DIALOG_Y_ORIGIN" value="484"/>
 		<item key="DIALOG_WIDTH" value="322"/>
 		<item key="DIALOG_HEIGHT" value="391"/>
 		<item key="DIALOG_FONT_NAME" value="1|Segoe UI|9.0|0|WINDOWS|1|-12|0|0|0|400|0|0|0|1|0|0|0|0|Segoe UI"/>

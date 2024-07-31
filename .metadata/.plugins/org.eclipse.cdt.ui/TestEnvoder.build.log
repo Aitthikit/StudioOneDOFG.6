@@ -1,10 +1,131 @@
-14:56:24 **** Build of configuration Debug for project TestEnvoder ****
+18:12:38 **** Incremental Build of configuration Debug for project TestEnvoder ****
 make -j12 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32G474xx -c -I../Core/Inc -I../Drivers/STM32G4xx_HAL_Driver/Inc -I../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
+In file included from ../Core/Inc/stm32g4xx_hal_conf.h:344,
+                 from ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal.h:29,
+                 from ../Core/Inc/main.h:30,
+                 from ../Core/Src/main.c:20:
+../Core/Src/main.c: In function 'Motor1':
+../Core/Src/main.c:1340:63: warning: implicit declaration of function 'fabs' [-Wimplicit-function-declaration]
+ 1340 |                 __HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_2, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:21:1: note: include '<math.h>' or provide a declaration of 'fabs'
+   20 | #include "main.h"
+  +++ |+#include <math.h>
+   21 | 
+../Core/Src/main.c:1340:63: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1340 |                 __HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_2, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1340:63: note: include '<math.h>' or provide a declaration of 'fabs'
+ 1340 |                 __HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_2, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1346:63: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1346 |                 __HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_2, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1346:63: note: include '<math.h>' or provide a declaration of 'fabs'
+ 1346 |                 __HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_2, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c: In function 'Motor2':
+../Core/Src/main.c:1355:63: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1355 |                 __HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_1, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1355:63: note: include '<math.h>' or provide a declaration of 'fabs'
+ 1355 |                 __HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_1, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1361:63: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1361 |                 __HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_1, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1361:63: note: include '<math.h>' or provide a declaration of 'fabs'
+ 1361 |                 __HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_1, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c: In function 'Motor3':
+../Core/Src/main.c:1370:63: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1370 |                 __HAL_TIM_SET_COMPARE(&htim16, TIM_CHANNEL_1, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1370:63: note: include '<math.h>' or provide a declaration of 'fabs'
+ 1370 |                 __HAL_TIM_SET_COMPARE(&htim16, TIM_CHANNEL_1, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1376:63: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1376 |                 __HAL_TIM_SET_COMPARE(&htim16, TIM_CHANNEL_1, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1376:63: note: include '<math.h>' or provide a declaration of 'fabs'
+ 1376 |                 __HAL_TIM_SET_COMPARE(&htim16, TIM_CHANNEL_1, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c: In function 'Motor4':
+../Core/Src/main.c:1385:63: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1385 |                 __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1385:63: note: include '<math.h>' or provide a declaration of 'fabs'
+ 1385 |                 __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1391:63: warning: incompatible implicit declaration of built-in function 'fabs' [-Wbuiltin-declaration-mismatch]
+ 1391 |                 __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+../Core/Src/main.c:1391:63: note: include '<math.h>' or provide a declaration of 'fabs'
+ 1391 |                 __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, fabs(speed));
+      |                                                               ^~~~
+../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim.h:1672:72: note: in definition of macro '__HAL_TIM_SET_COMPARE'
+ 1672 |   (((__CHANNEL__) == TIM_CHANNEL_1) ? ((__HANDLE__)->Instance->CCR1 = (__COMPARE__)) :\
+      |                                                                        ^~~~~~~~~~~
+arm-none-eabi-gcc -o "TestEnvoder.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Users\AAA\STM32CubeIDE\workspace_1.14.1\StudioOneDOFG.6\TestEnvoder\STM32G474RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="TestEnvoder.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: TestEnvoder.elf
+ 
 arm-none-eabi-size  TestEnvoder.elf 
+arm-none-eabi-objdump -h -S TestEnvoder.elf  > "TestEnvoder.list"
    text	   data	    bss	    dec	    hex	filename
-  22056	     12	   2088	  24156	   5e5c	TestEnvoder.elf
+  37968	     48	   3128	  41144	   a0b8	TestEnvoder.elf
 Finished building: default.size.stdout
  
+Finished building: TestEnvoder.list
+ 
 
-14:56:24 Build Finished. 0 errors, 0 warnings. (took 552ms)
+18:12:45 Build Finished. 0 errors, 9 warnings. (took 7s.318ms)
 

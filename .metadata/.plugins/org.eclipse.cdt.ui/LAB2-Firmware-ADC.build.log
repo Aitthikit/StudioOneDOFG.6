@@ -1,4 +1,4 @@
-14:56:19 **** Build of configuration Debug for project LAB2-Firmware-ADC ****
+14:49:16 **** Build of configuration Debug for project LAB2-Firmware-ADC ****
 make -j12 all 
 arm-none-eabi-size  LAB2-Firmware-ADC.elf 
    text	   data	    bss	    dec	    hex	filename
@@ -6,5 +6,5 @@ arm-none-eabi-size  LAB2-Firmware-ADC.elf
 Finished building: default.size.stdout
  
 
-14:56:21 Build Finished. 0 errors, 0 warnings. (took 2s.241ms)
+14:49:19 Build Finished. 0 errors, 0 warnings. (took 2s.958ms)
 
